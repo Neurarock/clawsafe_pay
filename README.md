@@ -76,6 +76,17 @@ All ports are configurable via `.env` environment variables.
 
 ## Quick Start
 
+### Simple demo:
+
+To start service and dashboard:
+```bash
+bash demo.sh
+```
+To stop service and dashboard:
+```bash
+bash demo.sh stop
+```
+
 ### 1. Prerequisites
 
 - Python 3.11+
