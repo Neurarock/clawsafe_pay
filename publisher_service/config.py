@@ -27,7 +27,8 @@ SIGNER_FROM_ADDRESS: str = os.getenv("SIGNER_FROM_ADDRESS", "0x00000000000000000
 SEPOLIA_RPC_URL: str = os.getenv("SEPOLIA_RPC_URL", "https://ethereum-sepolia-rpc.publicnode.com")
 
 # ── Policy overrides ──────────────────────────────────────────────────────────
-POLICY_MAX_AMOUNT_WEI: int = int(os.getenv("POLICY_MAX_AMOUNT_WEI", "50000000000000000"))
+_raw_max = os.getenv("POLICY_MAX_AMOUNT_WEI")
+POLICY_MAX_AMOUNT_WEI: int = int(_raw_max) if _raw_max else 1_000_000_000_000_000_000  # 1 ETH
 _raw_allowlist: str = os.getenv("POLICY_RECIPIENT_ALLOWLIST", "*")
 POLICY_RECIPIENT_ALLOWLIST: list[str] = [a.strip() for a in _raw_allowlist.split(",") if a.strip()]
 POLICY_TIP_WEI: int = int(os.getenv("POLICY_TIP_WEI", "1500000000"))

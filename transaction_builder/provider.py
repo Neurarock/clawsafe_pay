@@ -61,6 +61,14 @@ class Web3Provider(ProviderInterface):
         except Exception as exc:
             raise ProviderError(f"Failed to fetch nonce for {address}: {exc}") from exc
 
+    async def get_balance(self, address: str) -> int:
+        try:
+            return await self._w3.eth.get_balance(
+                self._w3.to_checksum_address(address), "latest"
+            )
+        except Exception as exc:
+            raise ProviderError(f"Failed to fetch balance for {address}: {exc}") from exc
+
     async def get_gas_estimate(self) -> GasEstimate:
         try:
             block = await self._w3.eth.get_block("pending")

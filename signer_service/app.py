@@ -168,10 +168,10 @@ async def _sign_workflow(tx_id: str, req: SignRequest):
         db.update_status(tx_id, "expired")
         logger.warning("Tx %s auth timed out", tx_id)
     except Exception as exc:
-        reason = str(exc)
-        logger.error("Sign workflow FAILED for tx %s: %s", tx_id, reason)
-        logger.debug("Tx %s traceback:", tx_id, exc_info=True)
-        db.update_status(tx_id, "sign_failed", error_reason=reason)
+            reason = str(exc)
+            logger.error("Sign workflow FAILED for tx %s: %s", tx_id, reason)
+            logger.debug("Tx %s traceback:", tx_id, exc_info=True)
+            db.update_status(tx_id, "sign_failed", error_reason=reason)
 
 
 # ── Endpoints ───────────────────────────────────────────────────────────────

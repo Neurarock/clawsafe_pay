@@ -24,6 +24,7 @@ from .models import (
     DraftTx,
     PaymentIntent,
     PolicyConfig,
+    PolicyError,
     SEPOLIA_CHAIN_ID,
 )
 from .policy import validate_intent, validate_draft_tx
@@ -135,6 +136,20 @@ async def build_draft_tx(
     nonce = await provider.get_nonce(from_address)
     gas_estimate = await provider.get_gas_estimate()
     base_fee = gas_estimate.base_fee_wei
+
+    # ── Step 2.5: Balance check ──────────────────────────────────────────────
+    if hasattr(provider, 'get_balance'):
+        balance = await provider.get_balance(from_address)
+        amount_wei = int(intent.amount_wei)
+        # Rough gas cost estimate: gas_limit * (2 * base_fee + suggested_tip)
+        est_gas_cost = 21_000 * (2 * base_fee + gas_estimate.max_priority_fee_wei)
+        required = amount_wei + est_gas_cost
+        if balance < required:
+            raise PolicyError(
+                f"Insufficient balance: wallet has {balance / 1e18:.6f} ETH "
+                f"but tx needs ~{required / 1e18:.6f} ETH "
+                f"(value {amount_wei / 1e18:.6f} + gas ~{est_gas_cost / 1e18:.6f})"
+            )
 
     # ── Step 3: Compute fee fields with caps ─────────────────────────────────
     # Cap the tip: use node suggestion but never exceed policy.tip_wei

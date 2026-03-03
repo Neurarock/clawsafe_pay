@@ -130,7 +130,7 @@ class PolicyConfig(BaseModel):
 
     # Maximum transfer value
     max_amount_wei: int = Field(
-        default=50_000_000_000_000_000,  # 0.05 ETH
+        default=1_000_000_000_000_000_000,  # 1.0 ETH
         description="Hard cap on transfer value",
     )
     # Gas
