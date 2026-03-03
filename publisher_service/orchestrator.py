@@ -175,53 +175,58 @@ async def run_intent_workflow(intent_id: str) -> None:
     # ── Step 4: Poll Signer for Result ───────────────────────────────────────
     deadline = time.monotonic() + config.SIGNER_POLL_TIMEOUT_SECONDS
 
-    while time.monotonic() < deadline:
-        await asyncio.sleep(config.SIGNER_POLL_INTERVAL_SECONDS)
-        try:
-            status_resp = await poll_signer_status(signer_tx_id)
-        except DownstreamError as exc:
-            logger.warning("Intent %s: signer poll error — %s", intent_id, exc)
-            continue
+    try:
+        while time.monotonic() < deadline:
+            await asyncio.sleep(config.SIGNER_POLL_INTERVAL_SECONDS)
+            try:
+                status_resp = await poll_signer_status(signer_tx_id)
+            except Exception as exc:
+                logger.warning("Intent %s: signer poll error — %s", intent_id, exc)
+                continue
 
-        signer_status = status_resp.status
+            signer_status = status_resp.status
 
-        if signer_status in _SIGNER_PENDING_STATUSES:
-            continue  # still in progress
+            if signer_status in _SIGNER_PENDING_STATUSES:
+                continue  # still in progress
 
-        # Terminal states
-        if signer_status in ("signed", "broadcast"):
-            if status_resp.signed_tx_hash:
-                db.store_tx_hash(intent_id, status_resp.signed_tx_hash)
-            db.update_status(intent_id, "broadcast")
-            db.update_status(intent_id, "confirmed")
-            logger.info(
-                "Intent %s confirmed. tx_hash=%s", intent_id, status_resp.signed_tx_hash,
+            # Terminal states
+            if signer_status in ("signed", "broadcast"):
+                if status_resp.signed_tx_hash:
+                    db.store_tx_hash(intent_id, status_resp.signed_tx_hash)
+                db.update_status(intent_id, "broadcast")
+                db.update_status(intent_id, "confirmed")
+                logger.info(
+                    "Intent %s confirmed. tx_hash=%s", intent_id, status_resp.signed_tx_hash,
+                )
+                return
+
+            if signer_status == "rejected":
+                db.update_status(intent_id, "rejected")
+                logger.info("Intent %s rejected by user", intent_id)
+                return
+
+            if signer_status == "expired":
+                db.update_status(intent_id, "expired")
+                return
+
+            if signer_status == "sign_failed":
+                reason = status_resp.error_reason or "unknown error"
+                db.update_status(
+                    intent_id, "failed",
+                    error=f"Signing/broadcast failed: {reason}",
+                )
+                logger.error("Intent %s SIGN_FAILED: %s", intent_id, reason)
+                return
+
+            # Unknown status — keep polling
+            logger.warning(
+                "Intent %s: unknown signer status %r — continuing poll",
+                intent_id, signer_status,
             )
-            return
-
-        if signer_status == "rejected":
-            db.update_status(intent_id, "rejected")
-            return
-
-        if signer_status == "expired":
-            db.update_status(intent_id, "expired")
-            return
-
-        if signer_status == "sign_failed":
-            reason = status_resp.error_reason or "unknown error"
-            db.update_status(
-                intent_id, "failed",
-                error=f"Signing/broadcast failed: {reason}",
-            )
-            logger.error("Intent %s SIGN_FAILED: %s", intent_id, reason)
-            return
-
-        # Unknown status — keep polling
-        logger.warning(
-            "Intent %s: unknown signer status %r — continuing poll",
-            intent_id, signer_status,
-        )
-    else:
-        # Timeout
-        db.update_status(intent_id, "expired", error="Signer poll timeout")
-        logger.warning("Intent %s: signer poll timed out", intent_id)
+        else:
+            # Timeout
+            db.update_status(intent_id, "expired", error="Signer poll timeout")
+            logger.warning("Intent %s: signer poll timed out", intent_id)
+    except Exception as exc:
+        logger.error("Intent %s: poll loop crashed — %s", intent_id, exc, exc_info=True)
+        db.update_status(intent_id, "failed", error=f"Poll error: {exc}")
