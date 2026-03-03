@@ -15,6 +15,17 @@ logger = logging.getLogger("user_auth.telegram")
 BASE_URL = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}"
 
 
+def _escape_md2(text: str) -> str:
+    """Escape special characters for Telegram MarkdownV2."""
+    special = r"_*[]()~`>#+-=|{}.!\\"
+    out = []
+    for ch in text:
+        if ch in special:
+            out.append("\\")
+        out.append(ch)
+    return "".join(out)
+
+
 async def send_auth_prompt(request_id: str, user_id: str, action: str) -> Optional[int]:
     """
     Send an inline-keyboard message to the configured Telegram chat
@@ -22,19 +33,27 @@ async def send_auth_prompt(request_id: str, user_id: str, action: str) -> Option
 
     Returns the Telegram message_id on success, or None on failure.
     """
+    esc = _escape_md2
+
+    # Short request id for display (first 8 chars)
+    short_id = request_id[:8] if len(request_id) > 8 else request_id
+
     text = (
-        "🔐 *Authentication Request*\n\n"
-        f"**Request ID:** `{request_id}`\n"
-        f"**User:** `{user_id}`\n"
-        f"**Action:** {action}\n\n"
-        "Please approve or reject this request:"
+        "🔐  *AUTHORIZATION REQUIRED*\n"
+        "━━━━━━━━━━━━━━━━━━━━━━\n\n"
+        f"📋  *Action:*  {esc(action)}\n\n"
+        f"👤  *Requested by:*  `{esc(user_id)}`\n"
+        f"🆔  *Ref:*  `{esc(short_id)}…`\n\n"
+        "━━━━━━━━━━━━━━━━━━━━━━\n"
+        "⏳  _This request will expire in 5 minutes\\._\n"
+        "⚠️  _Only approve if you initiated this transaction\\._"
     )
 
     inline_keyboard = {
         "inline_keyboard": [
             [
-                {"text": "✅ Approve", "callback_data": f"approve:{request_id}"},
-                {"text": "❌ Reject", "callback_data": f"reject:{request_id}"},
+                {"text": "✅  Approve", "callback_data": f"approve:{request_id}"},
+                {"text": "❌  Reject", "callback_data": f"reject:{request_id}"},
             ]
         ]
     }
@@ -42,7 +61,7 @@ async def send_auth_prompt(request_id: str, user_id: str, action: str) -> Option
     payload = {
         "chat_id": TELEGRAM_CHAT_ID,
         "text": text,
-        "parse_mode": "Markdown",
+        "parse_mode": "MarkdownV2",
         "reply_markup": inline_keyboard,
     }
 
@@ -68,18 +87,31 @@ async def edit_message_after_resolution(message_id: int, status: str, request_id
     Edit the original Telegram message to reflect the final status,
     removing the inline keyboard so the buttons can't be tapped again.
     """
-    emoji = "✅" if status == "approved" else "❌"
+    esc = _escape_md2
+    short_id = request_id[:8] if len(request_id) > 8 else request_id
+
+    if status == "approved":
+        emoji = "✅"
+        label = "APPROVED"
+    elif status == "expired":
+        emoji = "⏰"
+        label = "EXPIRED"
+    else:
+        emoji = "❌"
+        label = "REJECTED"
+
     text = (
-        f"{emoji} *Request {status.upper()}*\n\n"
-        f"**Request ID:** `{request_id}`\n\n"
-        "This request has been resolved."
+        f"{emoji}  *{esc(label)}*"
+        "\n━━━━━━━━━━━━━━━━━━━━━━\n\n"
+        f"🆔  *Ref:*  `{esc(short_id)}…`\n\n"
+        f"_This request has been {esc(status)}\._"
     )
 
     payload = {
         "chat_id": TELEGRAM_CHAT_ID,
         "message_id": message_id,
         "text": text,
-        "parse_mode": "Markdown",
+        "parse_mode": "MarkdownV2",
     }
 
     try:

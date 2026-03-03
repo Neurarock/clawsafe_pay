@@ -13,11 +13,9 @@ import publisher_service.config as config
 from publisher_service.clients import (
     DownstreamError,
     call_reviewer,
-    call_signer,
-    poll_auth_status,
-    request_auth,
+    submit_to_signer,
+    poll_signer_status,
 )
-from publisher_service.security import compute_hmac
 from publisher_service.models import ReviewReport
 from datetime import datetime, timezone, timedelta
 from transaction_builder.models import DraftTx
@@ -76,115 +74,105 @@ async def test_call_reviewer_5xx_raises():
         await call_reviewer(_fake_draft(), current_base_fee_wei=10_000_000_000)
 
 
-# ── call_signer ───────────────────────────────────────────────────────────────
+# ── submit_to_signer ─────────────────────────────────────────────────────────
 
 @respx.mock
-async def test_call_signer_success():
-    tx_hash = "0x" + "aa" * 32
+async def test_submit_to_signer_success():
     signer_payload = {
-        "tx_hash": tx_hash,
-        "signed_at": "2026-03-03T12:00:00+00:00",
+        "tx_id": "signer-tx-001",
+        "status": "pending_auth",
+        "message": "Transaction queued — waiting for Telegram approval",
     }
     route = respx.post(f"{config.SIGNER_SERVICE_URL}/sign").mock(
-        return_value=httpx.Response(200, json=signer_payload)
+        return_value=httpx.Response(202, json=signer_payload)
     )
-    auth_request_id = "client-test-001:some-uuid"
-    result = await call_signer(
-        intent_id="client-test-001",
-        digest=FAKE_DIGEST,
-        draft_tx=_fake_draft(),
-        auth_request_id=auth_request_id,
-    )
-    assert result == tx_hash
-    payload = json.loads(route.calls[0].request.content.decode())
-    assert payload["intent_id"] == "client-test-001"
-    assert payload["digest"] == FAKE_DIGEST
-    assert payload["auth_request_id"] == auth_request_id
-    assert payload["draft_tx"]["intent_id"] == "client-test-001"
-
-
-@respx.mock
-async def test_call_signer_4xx_raises():
-    respx.post(f"{config.SIGNER_SERVICE_URL}/sign").mock(
-        return_value=httpx.Response(400, json={"detail": "bad digest"})
-    )
-    with pytest.raises(DownstreamError):
-        await call_signer(
-            intent_id="client-test-001",
-            digest=FAKE_DIGEST,
-            draft_tx=_fake_draft(),
-            auth_request_id="client-test-001:some-uuid",
-        )
-
-
-# ── request_auth ──────────────────────────────────────────────────────────────
-
-@respx.mock
-async def test_request_auth_success():
-    auth_request_id = "req-001"
-    route = respx.post(f"{config.USER_AUTH_SERVICE_URL}/auth/request").mock(
-        return_value=httpx.Response(200, json={
-            "request_id": auth_request_id,
-            "status": "pending",
-            "message": "sent",
-        })
-    )
-    result = await request_auth(
-        intent_id="client-test-001",
+    result = await submit_to_signer(
+        to=TO_ADDR,
+        value_wei="10000000000000000",
         user_id="userA",
-        action="approve payment",
-        auth_request_id=auth_request_id,
+        note="test payment",
+        data="0x",
+        gas_limit=21000,
     )
-    assert result == auth_request_id
+    assert result.tx_id == "signer-tx-001"
+    assert result.status == "pending_auth"
     payload = json.loads(route.calls[0].request.content.decode())
-    assert payload["request_id"] == auth_request_id
+    assert payload["to"] == TO_ADDR
+    assert payload["value_wei"] == "10000000000000000"
     assert payload["user_id"] == "userA"
-    assert payload["action"] == "approve payment"
-    assert payload["hmac_digest"] == compute_hmac(
-        request_id=auth_request_id,
-        user_id="userA",
-        action="approve payment",
-    )
+    assert payload["note"] == "test payment"
 
 
 @respx.mock
-async def test_request_auth_4xx_raises():
-    respx.post(f"{config.USER_AUTH_SERVICE_URL}/auth/request").mock(
-        return_value=httpx.Response(401, json={"detail": "invalid hmac"})
+async def test_submit_to_signer_4xx_raises():
+    respx.post(f"{config.SIGNER_SERVICE_URL}/sign").mock(
+        return_value=httpx.Response(400, json={"detail": "Invalid recipient address"})
     )
     with pytest.raises(DownstreamError):
-        await request_auth(
-            intent_id="client-test-001",
+        await submit_to_signer(
+            to="bad-address",
+            value_wei="10000000000000000",
             user_id="userA",
-            action="approve payment",
-            auth_request_id="req-002",
         )
 
 
-# ── poll_auth_status ──────────────────────────────────────────────────────────
+# ── poll_signer_status ────────────────────────────────────────────────────────
 
 @respx.mock
-async def test_poll_auth_status_returns_status():
-    auth_request_id = "req-001"
-    respx.get(f"{config.USER_AUTH_SERVICE_URL}/auth/{auth_request_id}").mock(
+async def test_poll_signer_status_signed():
+    tx_id = "signer-tx-001"
+    tx_hash = "0x" + "aa" * 32
+    respx.get(f"{config.SIGNER_SERVICE_URL}/sign/{tx_id}").mock(
         return_value=httpx.Response(200, json={
-            "request_id": auth_request_id,
-            "status": "approved",
+            "tx_id": tx_id,
+            "status": "signed",
+            "to": TO_ADDR,
+            "value_wei": "10000000000000000",
             "user_id": "userA",
-            "action": "pay",
+            "note": "test",
+            "signed_tx_hash": tx_hash,
             "created_at": "2026-03-03T12:00:00+00:00",
-            "resolved_at": "2026-03-03T12:00:05+00:00",
+            "resolved_at": "2026-03-03T12:00:10+00:00",
         })
     )
-    status = await poll_auth_status(auth_request_id)
-    assert status == "approved"
+    result = await poll_signer_status(tx_id)
+    assert result.status == "signed"
+    assert result.signed_tx_hash == tx_hash
 
 
 @respx.mock
-async def test_poll_auth_status_5xx_raises():
-    auth_request_id = "req-err"
-    respx.get(f"{config.USER_AUTH_SERVICE_URL}/auth/{auth_request_id}").mock(
+async def test_poll_signer_status_pending():
+    tx_id = "signer-tx-002"
+    respx.get(f"{config.SIGNER_SERVICE_URL}/sign/{tx_id}").mock(
+        return_value=httpx.Response(200, json={
+            "tx_id": tx_id,
+            "status": "pending_auth",
+            "to": TO_ADDR,
+            "value_wei": "10000000000000000",
+            "user_id": "userA",
+            "note": "test",
+            "created_at": "2026-03-03T12:00:00+00:00",
+        })
+    )
+    result = await poll_signer_status(tx_id)
+    assert result.status == "pending_auth"
+
+
+@respx.mock
+async def test_poll_signer_status_404_raises():
+    tx_id = "does-not-exist"
+    respx.get(f"{config.SIGNER_SERVICE_URL}/sign/{tx_id}").mock(
+        return_value=httpx.Response(404, json={"detail": "Transaction not found"})
+    )
+    with pytest.raises(DownstreamError):
+        await poll_signer_status(tx_id)
+
+
+@respx.mock
+async def test_poll_signer_status_5xx_raises():
+    tx_id = "signer-tx-err"
+    respx.get(f"{config.SIGNER_SERVICE_URL}/sign/{tx_id}").mock(
         return_value=httpx.Response(503, text="unavailable")
     )
     with pytest.raises(DownstreamError):
-        await poll_auth_status(auth_request_id)
+        await poll_signer_status(tx_id)

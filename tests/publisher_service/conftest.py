@@ -27,9 +27,9 @@ def patch_config(tmp_path, monkeypatch):
     db_path = str(tmp_path / "test_intents.db")
     monkeypatch.setattr(config, "DATABASE_PATH", db_path)
     monkeypatch.setattr(config, "PUBLISHER_API_KEY", API_KEY)
-    # Speed up approval polling in tests
-    monkeypatch.setattr(config, "APPROVAL_POLL_INTERVAL_SECONDS", 0.01)
-    monkeypatch.setattr(config, "APPROVAL_TIMEOUT_SECONDS", 0.1)
+    # Speed up signer polling in tests
+    monkeypatch.setattr(config, "SIGNER_POLL_INTERVAL_SECONDS", 0.01)
+    monkeypatch.setattr(config, "SIGNER_POLL_TIMEOUT_SECONDS", 0.1)
     # Disable the Flock injection filter for unit tests — no real API calls
     monkeypatch.setattr(config, "FLOCK_API_KEY", "")
     # Re-patch the database module's imported constant too

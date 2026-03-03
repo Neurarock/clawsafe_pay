@@ -2,7 +2,7 @@
 
 `publisher_service` is the payment orchestrator for ClawSafe Pay.
 
-It accepts a `PaymentIntent`, builds a draft Sepolia transaction, gets reviewer input, requests user approval, then calls signer to broadcast.
+It accepts a `PaymentIntent`, builds a draft Sepolia transaction, gets reviewer input, then submits to signer_service which handles Telegram approval, signing, and broadcasting to the network.
 
 ## What It Does
 
@@ -10,8 +10,8 @@ It accepts a `PaymentIntent`, builds a draft Sepolia transaction, gets reviewer 
 - Runs the end-to-end workflow:
   - build tx draft
   - reviewer check
-  - user approval request/poll
-  - signer call
+  - submit to signer_service (handles auth + signing + broadcasting)
+  - poll signer for result
   - store tx hash and final status
 - Persists workflow state in SQLite for polling/audit.
 
@@ -30,7 +30,7 @@ All intent endpoints require `X-API-Key`.
 
 Normal path:
 
-`pending -> building -> reviewing -> awaiting_approval -> signing -> broadcast -> confirmed`
+`pending -> building -> reviewing -> signing -> broadcast -> confirmed`
 
 Terminal error/decision states:
 
@@ -42,9 +42,10 @@ Terminal error/decision states:
 2. Build `DraftTx` via `transaction_builder`.
 3. Call `reviewer_service` for verdict (`OK|WARN|BLOCK`).
 4. Enforce digest consistency (`review.digest` must match `draft.digest`).
-5. Request user auth from `user_auth`, then poll approval status.
-6. On approval, call `signer_service` with digest + draft.
-7. Store `tx_hash` and mark status `confirmed` (MVP behavior).
+5. Submit to `signer_service` (`POST /sign`).
+6. Poll `signer_service` (`GET /sign/{tx_id}`) for result.
+7. Signer handles Telegram auth, signs the tx, and broadcasts to the network.
+8. Store `tx_hash` and mark status `confirmed`.
 
 ## Safety Checks
 

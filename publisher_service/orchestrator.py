@@ -2,25 +2,27 @@
 Core orchestration workflow for publisher_service.
 
 run_intent_workflow(intent_id) drives an intent through the full state machine:
-  pending → building → reviewing → awaiting_approval → signing → broadcast → confirmed
-                                                                ↘
-                                             rejected / expired / blocked / failed
+  pending → building → reviewing → signing → broadcast → confirmed
+                                                        ↘
+                             rejected / expired / blocked / failed
+
+Authentication is handled entirely by signer_service.  The publisher
+submits signing requests and polls for results — it never contacts
+user_auth directly.
 """
 from __future__ import annotations
 
 import asyncio
 import logging
 import time
-from uuid import uuid4
 
 import publisher_service.config as config
 import publisher_service.database as db
 from publisher_service.clients import (
     DownstreamError,
     call_reviewer,
-    call_signer,
-    poll_auth_status,
-    request_auth,
+    submit_to_signer,
+    poll_signer_status,
 )
 from transaction_builder import (
     PolicyConfig,
@@ -32,6 +34,9 @@ from transaction_builder import (
 from transaction_builder.models import PaymentIntent
 
 logger = logging.getLogger("publisher_service.orchestrator")
+
+# Signer statuses that mean "still in progress"
+_SIGNER_PENDING_STATUSES = {"pending_auth", "approved"}  # "broadcast" is terminal success
 
 
 def _make_policy() -> PolicyConfig:
@@ -123,72 +128,85 @@ async def run_intent_workflow(intent_id: str) -> None:
 
     logger.info("Intent %s: reviewer verdict=%s, continuing", intent_id, review.verdict)
 
-    # ── Step 3: Request Telegram Approval ────────────────────────────────────
-    auth_request_id = f"{intent_id}:{uuid4()}"
-    action = (
+    # ── Step 3: Submit to Signer ─────────────────────────────────────────────
+    #   The signer_service handles Telegram auth internally.
+    #   We just submit the tx details and poll for the result.
+    db.update_status(intent_id, "signing")
+
+    note = (
         f"Pay {intent.amount_wei} wei ({int(intent.amount_wei)/1e18:.6f} ETH) "
         f"to {draft.to} on Sepolia | "
-        f"Gas: {draft.gas_limit} × {int(draft.max_fee_per_gas)//1_000_000_000} gwei | "
         f"Reviewer: {review.verdict} | "
         f"Digest: {draft.digest[:10]}…{draft.digest[-6:]}"
     )
 
     try:
-        await request_auth(
-            intent_id=intent_id,
+        signer_resp = await submit_to_signer(
+            to=draft.to,
+            value_wei=draft.value_wei,
             user_id=intent.from_user,
-            action=action,
-            auth_request_id=auth_request_id,
+            note=note,
+            data=draft.data,
+            gas_limit=draft.gas_limit,
         )
     except DownstreamError as exc:
-        db.update_status(intent_id, "failed", error=f"Auth request error: {exc}")
+        db.update_status(intent_id, "failed", error=f"Signer submit error: {exc}")
         return
 
-    db.store_auth_request_id(intent_id, auth_request_id)
-    db.update_status(intent_id, "awaiting_approval")
+    signer_tx_id = signer_resp.tx_id
+    db.store_signer_tx_id(intent_id, signer_tx_id)
+    logger.info("Intent %s: submitted to signer, tx_id=%s", intent_id, signer_tx_id)
 
-    # ── Step 4: Poll for Approval ────────────────────────────────────────────
-    deadline = time.monotonic() + config.APPROVAL_TIMEOUT_SECONDS
-    approval_status = "pending"
+    # ── Step 4: Poll Signer for Result ───────────────────────────────────────
+    deadline = time.monotonic() + config.SIGNER_POLL_TIMEOUT_SECONDS
 
     while time.monotonic() < deadline:
-        await asyncio.sleep(config.APPROVAL_POLL_INTERVAL_SECONDS)
+        await asyncio.sleep(config.SIGNER_POLL_INTERVAL_SECONDS)
         try:
-            approval_status = await poll_auth_status(auth_request_id)
+            status_resp = await poll_signer_status(signer_tx_id)
         except DownstreamError as exc:
-            logger.warning("Intent %s: poll_auth error — %s", intent_id, exc)
+            logger.warning("Intent %s: signer poll error — %s", intent_id, exc)
             continue
 
-        if approval_status == "approved":
-            break
-        if approval_status in ("rejected", "expired"):
-            db.update_status(intent_id, approval_status)
+        signer_status = status_resp.status
+
+        if signer_status in _SIGNER_PENDING_STATUSES:
+            continue  # still in progress
+
+        # Terminal states
+        if signer_status in ("signed", "broadcast"):
+            if status_resp.signed_tx_hash:
+                db.store_tx_hash(intent_id, status_resp.signed_tx_hash)
+            db.update_status(intent_id, "broadcast")
+            db.update_status(intent_id, "confirmed")
+            logger.info(
+                "Intent %s confirmed. tx_hash=%s", intent_id, status_resp.signed_tx_hash,
+            )
             return
-        # "pending" → keep polling
-    else:
-        # Loop exhausted without approval
-        db.update_status(intent_id, "expired")
-        return
 
-    if approval_status != "approved":
-        db.update_status(intent_id, "expired")
-        return
+        if signer_status == "rejected":
+            db.update_status(intent_id, "rejected")
+            return
 
-    # ── Step 5: Call Signer ──────────────────────────────────────────────────
-    db.update_status(intent_id, "signing")
-    try:
-        tx_hash = await call_signer(
-            intent_id=intent_id,
-            digest=draft.digest,
-            draft_tx=draft,
-            auth_request_id=auth_request_id,
+        if signer_status == "expired":
+            db.update_status(intent_id, "expired")
+            return
+
+        if signer_status == "sign_failed":
+            reason = status_resp.error_reason or "unknown error"
+            db.update_status(
+                intent_id, "failed",
+                error=f"Signing/broadcast failed: {reason}",
+            )
+            logger.error("Intent %s SIGN_FAILED: %s", intent_id, reason)
+            return
+
+        # Unknown status — keep polling
+        logger.warning(
+            "Intent %s: unknown signer status %r — continuing poll",
+            intent_id, signer_status,
         )
-    except DownstreamError as exc:
-        db.update_status(intent_id, "failed", error=f"Signer error: {exc}")
-        return
-
-    db.store_tx_hash(intent_id, tx_hash)
-    db.update_status(intent_id, "broadcast")
-    # MVP: treat broadcast as confirmed immediately
-    db.update_status(intent_id, "confirmed")
-    logger.info("Intent %s confirmed. tx_hash=%s", intent_id, tx_hash)
+    else:
+        # Timeout
+        db.update_status(intent_id, "expired", error="Signer poll timeout")
+        logger.warning("Intent %s: signer poll timed out", intent_id)

@@ -42,6 +42,24 @@ class ReviewReport(BaseModel):
     model_used: str = ""
 
 
-class SignerResponse(BaseModel):
-    tx_hash: str
-    signed_at: str
+class SignerSubmitResponse(BaseModel):
+    """Response from signer_service POST /sign (202 Accepted)."""
+    tx_id: str
+    status: str
+    message: str
+
+
+class SignerStatusResponse(BaseModel):
+    """Response from signer_service GET /sign/{tx_id}."""
+    tx_id: str
+    status: str  # pending_auth | approved | rejected | expired | signed | sign_failed
+    to: str
+    value_wei: str
+    user_id: str
+    note: str
+    auth_request_id: Optional[str] = None
+    signed_tx_hash: Optional[str] = None
+    raw_signed_tx: Optional[str] = None
+    error_reason: Optional[str] = None
+    created_at: str
+    resolved_at: Optional[str] = None

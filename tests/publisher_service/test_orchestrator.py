@@ -12,7 +12,7 @@ from datetime import datetime, timezone, timedelta
 import publisher_service.database as db
 from publisher_service.clients import DownstreamError
 from publisher_service.orchestrator import run_intent_workflow
-from publisher_service.models import ReviewReport
+from publisher_service.models import ReviewReport, SignerSubmitResponse, SignerStatusResponse
 from transaction_builder.models import DraftTx, PolicyError, ProviderError
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
@@ -22,6 +22,7 @@ FROM_ADDR = "0x742d35cc6634c0532925a3b8d4c9d5a3aa5a3eb"
 TO_ADDR = "0xd8da6bf26964af9d7eed9e03e53415d37aa96045"
 FAKE_DIGEST = "0x" + "ab" * 32
 FAKE_TX_HASH = "0x" + "aa" * 32
+SIGNER_TX_ID = "signer-tx-001"
 
 
 def _fake_draft() -> DraftTx:
@@ -52,6 +53,28 @@ def _ok_review(verdict: str = "OK") -> ReviewReport:
     )
 
 
+def _signer_submit_resp() -> SignerSubmitResponse:
+    return SignerSubmitResponse(
+        tx_id=SIGNER_TX_ID,
+        status="pending_auth",
+        message="Transaction queued — waiting for Telegram approval",
+    )
+
+
+def _signer_status_resp(status: str = "broadcast", tx_hash: str = FAKE_TX_HASH) -> SignerStatusResponse:
+    return SignerStatusResponse(
+        tx_id=SIGNER_TX_ID,
+        status=status,
+        to=TO_ADDR,
+        value_wei="10000000000000000",
+        user_id="userA",
+        note="test",
+        signed_tx_hash=tx_hash if status in ("signed", "broadcast") else None,
+        created_at="2026-03-03T12:00:00+00:00",
+        resolved_at="2026-03-03T12:00:10+00:00" if status != "pending_auth" else None,
+    )
+
+
 def _insert_test_intent(intent_id: str = INTENT_ID):
     db.init_db()
     db.insert_intent(
@@ -66,36 +89,34 @@ def _insert_test_intent(intent_id: str = INTENT_ID):
 
 # ── Tests ─────────────────────────────────────────────────────────────────────
 
-@patch("publisher_service.orchestrator.call_signer", new_callable=AsyncMock)
-@patch("publisher_service.orchestrator.poll_auth_status", new_callable=AsyncMock)
-@patch("publisher_service.orchestrator.request_auth", new_callable=AsyncMock)
+@patch("publisher_service.orchestrator.poll_signer_status", new_callable=AsyncMock)
+@patch("publisher_service.orchestrator.submit_to_signer", new_callable=AsyncMock)
 @patch("publisher_service.orchestrator.call_reviewer", new_callable=AsyncMock)
 @patch("publisher_service.orchestrator.build_draft_tx", new_callable=AsyncMock)
 async def test_happy_path_reaches_confirmed(
-    mock_build, mock_review, mock_request_auth, mock_poll, mock_sign
+    mock_build, mock_review, mock_submit, mock_poll
 ):
     _insert_test_intent()
     mock_build.return_value = _fake_draft()
     mock_review.return_value = _ok_review("OK")
-    mock_request_auth.return_value = f"{INTENT_ID}:some-uuid"
-    mock_poll.return_value = "approved"
-    mock_sign.return_value = FAKE_TX_HASH
+    mock_submit.return_value = _signer_submit_resp()
+    mock_poll.return_value = _signer_status_resp("broadcast")
 
     await run_intent_workflow(INTENT_ID)
 
     row = db.get_intent(INTENT_ID)
     assert row["status"] == "confirmed"
     assert row["tx_hash"] == FAKE_TX_HASH
-    mock_sign.assert_called_once()
+    mock_submit.assert_called_once()
+    mock_poll.assert_called_once()
 
 
-@patch("publisher_service.orchestrator.call_signer", new_callable=AsyncMock)
-@patch("publisher_service.orchestrator.poll_auth_status", new_callable=AsyncMock)
-@patch("publisher_service.orchestrator.request_auth", new_callable=AsyncMock)
+@patch("publisher_service.orchestrator.poll_signer_status", new_callable=AsyncMock)
+@patch("publisher_service.orchestrator.submit_to_signer", new_callable=AsyncMock)
 @patch("publisher_service.orchestrator.call_reviewer", new_callable=AsyncMock)
 @patch("publisher_service.orchestrator.build_draft_tx", new_callable=AsyncMock)
 async def test_reviewer_block_stops_workflow(
-    mock_build, mock_review, mock_request_auth, mock_poll, mock_sign
+    mock_build, mock_review, mock_submit, mock_poll
 ):
     _insert_test_intent()
     mock_build.return_value = _fake_draft()
@@ -113,49 +134,44 @@ async def test_reviewer_block_stops_workflow(
 
     row = db.get_intent(INTENT_ID)
     assert row["status"] == "blocked"
-    mock_sign.assert_not_called()
-    mock_request_auth.assert_not_called()
+    mock_submit.assert_not_called()
 
 
-@patch("publisher_service.orchestrator.call_signer", new_callable=AsyncMock)
-@patch("publisher_service.orchestrator.poll_auth_status", new_callable=AsyncMock)
-@patch("publisher_service.orchestrator.request_auth", new_callable=AsyncMock)
+@patch("publisher_service.orchestrator.poll_signer_status", new_callable=AsyncMock)
+@patch("publisher_service.orchestrator.submit_to_signer", new_callable=AsyncMock)
 @patch("publisher_service.orchestrator.call_reviewer", new_callable=AsyncMock)
 @patch("publisher_service.orchestrator.build_draft_tx", new_callable=AsyncMock)
 async def test_user_rejection_sets_rejected(
-    mock_build, mock_review, mock_request_auth, mock_poll, mock_sign
+    mock_build, mock_review, mock_submit, mock_poll
 ):
     _insert_test_intent()
     mock_build.return_value = _fake_draft()
     mock_review.return_value = _ok_review()
-    mock_request_auth.return_value = f"{INTENT_ID}:uuid"
-    mock_poll.return_value = "rejected"
+    mock_submit.return_value = _signer_submit_resp()
+    mock_poll.return_value = _signer_status_resp("rejected")
 
     await run_intent_workflow(INTENT_ID)
 
     assert db.get_intent(INTENT_ID)["status"] == "rejected"
-    mock_sign.assert_not_called()
 
 
-@patch("publisher_service.orchestrator.call_signer", new_callable=AsyncMock)
-@patch("publisher_service.orchestrator.poll_auth_status", new_callable=AsyncMock)
-@patch("publisher_service.orchestrator.request_auth", new_callable=AsyncMock)
+@patch("publisher_service.orchestrator.poll_signer_status", new_callable=AsyncMock)
+@patch("publisher_service.orchestrator.submit_to_signer", new_callable=AsyncMock)
 @patch("publisher_service.orchestrator.call_reviewer", new_callable=AsyncMock)
 @patch("publisher_service.orchestrator.build_draft_tx", new_callable=AsyncMock)
-async def test_approval_timeout_sets_expired(
-    mock_build, mock_review, mock_request_auth, mock_poll, mock_sign
+async def test_signer_poll_timeout_sets_expired(
+    mock_build, mock_review, mock_submit, mock_poll
 ):
-    """Poll always returns 'pending'; timeout fires → expired."""
+    """Poll always returns pending_auth; timeout fires → expired."""
     _insert_test_intent()
     mock_build.return_value = _fake_draft()
     mock_review.return_value = _ok_review()
-    mock_request_auth.return_value = f"{INTENT_ID}:uuid"
-    mock_poll.return_value = "pending"   # never becomes approved
+    mock_submit.return_value = _signer_submit_resp()
+    mock_poll.return_value = _signer_status_resp("pending_auth")
 
     await run_intent_workflow(INTENT_ID)
 
     assert db.get_intent(INTENT_ID)["status"] == "expired"
-    mock_sign.assert_not_called()
 
 
 @patch("publisher_service.orchestrator.build_draft_tx", new_callable=AsyncMock)
@@ -194,13 +210,12 @@ async def test_unexpected_build_error_sets_failed(mock_build):
     assert "Build error" in row["error_message"]
 
 
-@patch("publisher_service.orchestrator.call_signer", new_callable=AsyncMock)
-@patch("publisher_service.orchestrator.poll_auth_status", new_callable=AsyncMock)
-@patch("publisher_service.orchestrator.request_auth", new_callable=AsyncMock)
+@patch("publisher_service.orchestrator.poll_signer_status", new_callable=AsyncMock)
+@patch("publisher_service.orchestrator.submit_to_signer", new_callable=AsyncMock)
 @patch("publisher_service.orchestrator.call_reviewer", new_callable=AsyncMock)
 @patch("publisher_service.orchestrator.build_draft_tx", new_callable=AsyncMock)
 async def test_digest_mismatch_sets_failed(
-    mock_build, mock_review, mock_request_auth, mock_poll, mock_sign
+    mock_build, mock_review, mock_submit, mock_poll
 ):
     """Review report returns a different digest → security alert → failed."""
     _insert_test_intent()
@@ -222,23 +237,21 @@ async def test_digest_mismatch_sets_failed(
     row = db.get_intent(INTENT_ID)
     assert row["status"] == "failed"
     assert "SECURITY" in row["error_message"] or "digest" in row["error_message"]
-    mock_sign.assert_not_called()
+    mock_submit.assert_not_called()
 
 
-@patch("publisher_service.orchestrator.call_signer", new_callable=AsyncMock)
-@patch("publisher_service.orchestrator.poll_auth_status", new_callable=AsyncMock)
-@patch("publisher_service.orchestrator.request_auth", new_callable=AsyncMock)
+@patch("publisher_service.orchestrator.poll_signer_status", new_callable=AsyncMock)
+@patch("publisher_service.orchestrator.submit_to_signer", new_callable=AsyncMock)
 @patch("publisher_service.orchestrator.call_reviewer", new_callable=AsyncMock)
 @patch("publisher_service.orchestrator.build_draft_tx", new_callable=AsyncMock)
 async def test_reviewer_downstream_error_defaults_to_warn_and_continues(
-    mock_build, mock_review, mock_request_auth, mock_poll, mock_sign
+    mock_build, mock_review, mock_submit, mock_poll
 ):
     _insert_test_intent()
     mock_build.return_value = _fake_draft()
     mock_review.side_effect = DownstreamError("reviewer down")
-    mock_request_auth.return_value = f"{INTENT_ID}:uuid"
-    mock_poll.return_value = "approved"
-    mock_sign.return_value = FAKE_TX_HASH
+    mock_submit.return_value = _signer_submit_resp()
+    mock_poll.return_value = _signer_status_resp("broadcast")
 
     await run_intent_workflow(INTENT_ID)
 
@@ -247,95 +260,104 @@ async def test_reviewer_downstream_error_defaults_to_warn_and_continues(
     report = json.loads(row["review_report_json"])
     assert report["verdict"] == "WARN"
     assert "unreachable" in report["reasons"][0]
-    mock_sign.assert_called_once()
+    mock_submit.assert_called_once()
 
 
-@patch("publisher_service.orchestrator.call_signer", new_callable=AsyncMock)
-@patch("publisher_service.orchestrator.poll_auth_status", new_callable=AsyncMock)
-@patch("publisher_service.orchestrator.request_auth", new_callable=AsyncMock)
+@patch("publisher_service.orchestrator.poll_signer_status", new_callable=AsyncMock)
+@patch("publisher_service.orchestrator.submit_to_signer", new_callable=AsyncMock)
 @patch("publisher_service.orchestrator.call_reviewer", new_callable=AsyncMock)
 @patch("publisher_service.orchestrator.build_draft_tx", new_callable=AsyncMock)
-async def test_auth_request_error_sets_failed(
-    mock_build, mock_review, mock_request_auth, mock_poll, mock_sign
+async def test_signer_submit_error_sets_failed(
+    mock_build, mock_review, mock_submit, mock_poll
 ):
     _insert_test_intent()
     mock_build.return_value = _fake_draft()
     mock_review.return_value = _ok_review()
-    mock_request_auth.side_effect = DownstreamError("auth down")
+    mock_submit.side_effect = DownstreamError("signer down")
 
     await run_intent_workflow(INTENT_ID)
 
     row = db.get_intent(INTENT_ID)
     assert row["status"] == "failed"
-    assert "Auth request error" in row["error_message"]
+    assert "Signer submit error" in row["error_message"]
     mock_poll.assert_not_called()
-    mock_sign.assert_not_called()
 
 
-@patch("publisher_service.orchestrator.call_signer", new_callable=AsyncMock)
-@patch("publisher_service.orchestrator.poll_auth_status", new_callable=AsyncMock)
-@patch("publisher_service.orchestrator.request_auth", new_callable=AsyncMock)
+@patch("publisher_service.orchestrator.poll_signer_status", new_callable=AsyncMock)
+@patch("publisher_service.orchestrator.submit_to_signer", new_callable=AsyncMock)
 @patch("publisher_service.orchestrator.call_reviewer", new_callable=AsyncMock)
 @patch("publisher_service.orchestrator.build_draft_tx", new_callable=AsyncMock)
-async def test_poll_auth_transient_error_eventually_approved(
-    mock_build, mock_review, mock_request_auth, mock_poll, mock_sign
+async def test_signer_poll_transient_error_eventually_signed(
+    mock_build, mock_review, mock_submit, mock_poll
 ):
     _insert_test_intent()
     mock_build.return_value = _fake_draft()
     mock_review.return_value = _ok_review()
-    mock_request_auth.return_value = f"{INTENT_ID}:uuid"
-    mock_poll.side_effect = [DownstreamError("temporary"), "approved"]
-    mock_sign.return_value = FAKE_TX_HASH
+    mock_submit.return_value = _signer_submit_resp()
+    mock_poll.side_effect = [DownstreamError("temporary"), _signer_status_resp("broadcast")]
 
     await run_intent_workflow(INTENT_ID)
 
     row = db.get_intent(INTENT_ID)
     assert row["status"] == "confirmed"
-    mock_sign.assert_called_once()
 
 
-@patch("publisher_service.orchestrator.call_signer", new_callable=AsyncMock)
-@patch("publisher_service.orchestrator.poll_auth_status", new_callable=AsyncMock)
-@patch("publisher_service.orchestrator.request_auth", new_callable=AsyncMock)
+@patch("publisher_service.orchestrator.poll_signer_status", new_callable=AsyncMock)
+@patch("publisher_service.orchestrator.submit_to_signer", new_callable=AsyncMock)
 @patch("publisher_service.orchestrator.call_reviewer", new_callable=AsyncMock)
 @patch("publisher_service.orchestrator.build_draft_tx", new_callable=AsyncMock)
-async def test_signer_error_sets_failed(
-    mock_build, mock_review, mock_request_auth, mock_poll, mock_sign
+async def test_sign_failed_sets_failed(
+    mock_build, mock_review, mock_submit, mock_poll
 ):
     _insert_test_intent()
     mock_build.return_value = _fake_draft()
     mock_review.return_value = _ok_review()
-    mock_request_auth.return_value = f"{INTENT_ID}:uuid"
-    mock_poll.return_value = "approved"
-    mock_sign.side_effect = DownstreamError("signer rejected")
+    mock_submit.return_value = _signer_submit_resp()
+    mock_poll.return_value = _signer_status_resp("sign_failed")
 
     await run_intent_workflow(INTENT_ID)
 
     row = db.get_intent(INTENT_ID)
     assert row["status"] == "failed"
-    assert "Signer error" in row["error_message"]
+    assert "failed" in row["error_message"].lower()
 
 
-@patch("publisher_service.orchestrator.call_signer", new_callable=AsyncMock)
-@patch("publisher_service.orchestrator.poll_auth_status", new_callable=AsyncMock)
-@patch("publisher_service.orchestrator.request_auth", new_callable=AsyncMock)
+@patch("publisher_service.orchestrator.poll_signer_status", new_callable=AsyncMock)
+@patch("publisher_service.orchestrator.submit_to_signer", new_callable=AsyncMock)
 @patch("publisher_service.orchestrator.call_reviewer", new_callable=AsyncMock)
 @patch("publisher_service.orchestrator.build_draft_tx", new_callable=AsyncMock)
 async def test_reviewer_warn_does_not_block(
-    mock_build, mock_review, mock_request_auth, mock_poll, mock_sign
+    mock_build, mock_review, mock_submit, mock_poll
 ):
-    """WARN verdict should NOT block — workflow continues to approval."""
+    """WARN verdict should NOT block — workflow continues to signing."""
     _insert_test_intent()
     mock_build.return_value = _fake_draft()
     mock_review.return_value = _ok_review("WARN")  # WARN, not BLOCK
-    mock_request_auth.return_value = f"{INTENT_ID}:uuid"
-    mock_poll.return_value = "approved"
-    mock_sign.return_value = FAKE_TX_HASH
+    mock_submit.return_value = _signer_submit_resp()
+    mock_poll.return_value = _signer_status_resp("broadcast")
 
     await run_intent_workflow(INTENT_ID)
 
     assert db.get_intent(INTENT_ID)["status"] == "confirmed"
-    mock_sign.assert_called_once()
+    mock_submit.assert_called_once()
+
+
+@patch("publisher_service.orchestrator.poll_signer_status", new_callable=AsyncMock)
+@patch("publisher_service.orchestrator.submit_to_signer", new_callable=AsyncMock)
+@patch("publisher_service.orchestrator.call_reviewer", new_callable=AsyncMock)
+@patch("publisher_service.orchestrator.build_draft_tx", new_callable=AsyncMock)
+async def test_signer_expired_sets_expired(
+    mock_build, mock_review, mock_submit, mock_poll
+):
+    _insert_test_intent()
+    mock_build.return_value = _fake_draft()
+    mock_review.return_value = _ok_review()
+    mock_submit.return_value = _signer_submit_resp()
+    mock_poll.return_value = _signer_status_resp("expired")
+
+    await run_intent_workflow(INTENT_ID)
+
+    assert db.get_intent(INTENT_ID)["status"] == "expired"
 
 
 # ── State machine invariants ──────────────────────────────────────────────────

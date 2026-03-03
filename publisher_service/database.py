@@ -28,7 +28,7 @@ CREATE TABLE IF NOT EXISTS payment_intents (
     updated_at          TEXT NOT NULL,
     draft_tx_json       TEXT,
     review_report_json  TEXT,
-    auth_request_id     TEXT,
+    signer_tx_id        TEXT,
     tx_hash             TEXT,
     error_message       TEXT
 );
@@ -131,12 +131,12 @@ def store_review_report(intent_id: str, report_dict: dict) -> None:
         )
 
 
-def store_auth_request_id(intent_id: str, auth_request_id: str) -> None:
+def store_signer_tx_id(intent_id: str, signer_tx_id: str) -> None:
     now = datetime.now(timezone.utc).isoformat()
     with _get_connection() as conn:
         conn.execute(
-            "UPDATE payment_intents SET auth_request_id = ?, updated_at = ? WHERE intent_id = ?",
-            (auth_request_id, now, intent_id),
+            "UPDATE payment_intents SET signer_tx_id = ?, updated_at = ? WHERE intent_id = ?",
+            (signer_tx_id, now, intent_id),
         )
 
 
@@ -147,3 +147,12 @@ def store_tx_hash(intent_id: str, tx_hash: str) -> None:
             "UPDATE payment_intents SET tx_hash = ?, updated_at = ? WHERE intent_id = ?",
             (tx_hash, now, intent_id),
         )
+
+
+def list_intents() -> list[dict]:
+    """Return all intents ordered by created_at descending."""
+    with _get_connection() as conn:
+        rows = conn.execute(
+            "SELECT * FROM payment_intents ORDER BY created_at DESC"
+        ).fetchall()
+    return [dict(r) for r in rows]

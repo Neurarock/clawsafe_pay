@@ -13,9 +13,11 @@ import asyncio
 import json
 import logging
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import Depends, FastAPI, HTTPException, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, HTMLResponse, FileResponse
+from fastapi.middleware.cors import CORSMiddleware
 
 import publisher_service.config as config
 import publisher_service.database as db
@@ -42,6 +44,13 @@ app = FastAPI(
     title="ClawSafe Pay – Publisher Service",
     version="0.1.0",
     lifespan=lifespan,
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # ── Rate-limit middleware ────────────────────────────────────────────────────
@@ -151,3 +160,34 @@ async def get_intent_status(intent_id: str):
         tx_hash=row["tx_hash"],
         error_message=row["error_message"],
     )
+
+
+@app.get("/intents", dependencies=[Depends(require_api_key)])
+async def list_intents():
+    """Return all intents ordered by created_at desc (for the dashboard)."""
+    rows = db.list_intents()
+    results = []
+    for row in rows:
+        results.append({
+            "intent_id": row["intent_id"],
+            "status": row["status"],
+            "from_user": row["from_user"],
+            "to_user": row["to_user"],
+            "to_address": row["to_address"],
+            "amount_wei": row["amount_wei"],
+            "note": row["note"],
+            "tx_hash": row["tx_hash"],
+            "error_message": row["error_message"],
+            "created_at": row["created_at"],
+            "updated_at": row["updated_at"],
+        })
+    return results
+
+
+@app.get("/dashboard", response_class=HTMLResponse)
+async def dashboard():
+    """Serve the ClawSafe Pay dashboard."""
+    dashboard_path = Path(__file__).resolve().parent.parent / "dashboard" / "index.html"
+    if not dashboard_path.exists():
+        raise HTTPException(status_code=404, detail="Dashboard not found")
+    return HTMLResponse(content=dashboard_path.read_text(), status_code=200)

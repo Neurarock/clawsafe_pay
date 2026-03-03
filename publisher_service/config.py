@@ -15,18 +15,16 @@ PUBLISHER_SERVICE_PORT: int = int(os.getenv("PUBLISHER_SERVICE_PORT", "8002"))
 
 # ── Downstream services ───────────────────────────────────────────────────────
 REVIEWER_SERVICE_URL: str = os.getenv("REVIEWER_SERVICE_URL", "http://localhost:8003")
-USER_AUTH_SERVICE_URL: str = os.getenv("USER_AUTH_SERVICE_URL", "http://localhost:8000")
 SIGNER_SERVICE_URL: str = os.getenv("SIGNER_SERVICE_URL", "http://localhost:8001")
 
-# ── Shared secrets ────────────────────────────────────────────────────────────
-HMAC_SECRET: str = os.getenv("HMAC_SECRET", "change-me-in-production")
+# ── API key for incoming requests ─────────────────────────────────────────────
 PUBLISHER_API_KEY: str = os.getenv("PUBLISHER_API_KEY", "change-me-publisher-key")
 
 # ── Signer wallet ─────────────────────────────────────────────────────────────
 SIGNER_FROM_ADDRESS: str = os.getenv("SIGNER_FROM_ADDRESS", "0x0000000000000000000000000000000000000000")
 
 # ── RPC ───────────────────────────────────────────────────────────────────────
-SEPOLIA_RPC_URL: str = os.getenv("SEPOLIA_RPC_URL", "https://rpc.sepolia.org")
+SEPOLIA_RPC_URL: str = os.getenv("SEPOLIA_RPC_URL", "https://ethereum-sepolia-rpc.publicnode.com")
 
 # ── Policy overrides ──────────────────────────────────────────────────────────
 POLICY_MAX_AMOUNT_WEI: int = int(os.getenv("POLICY_MAX_AMOUNT_WEI", "50000000000000000"))
@@ -34,9 +32,9 @@ _raw_allowlist: str = os.getenv("POLICY_RECIPIENT_ALLOWLIST", "*")
 POLICY_RECIPIENT_ALLOWLIST: list[str] = [a.strip() for a in _raw_allowlist.split(",") if a.strip()]
 POLICY_TIP_WEI: int = int(os.getenv("POLICY_TIP_WEI", "1500000000"))
 
-# ── Approval polling ──────────────────────────────────────────────────────────
-APPROVAL_POLL_INTERVAL_SECONDS: float = float(os.getenv("APPROVAL_POLL_INTERVAL_SECONDS", "3"))
-APPROVAL_TIMEOUT_SECONDS: float = float(os.getenv("APPROVAL_TIMEOUT_SECONDS", "120"))
+# ── Signer polling ───────────────────────────────────────────────────────────
+SIGNER_POLL_INTERVAL_SECONDS: float = float(os.getenv("SIGNER_POLL_INTERVAL_SECONDS", "3"))
+SIGNER_POLL_TIMEOUT_SECONDS: float = float(os.getenv("SIGNER_POLL_TIMEOUT_SECONDS", "360"))
 
 # ── Flock API (injection filter) ─────────────────────────────────────────────
 FLOCK_API_KEY: str = os.getenv("FLOCK_API_KEY", "")
