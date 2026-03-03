@@ -40,7 +40,7 @@ APPROVAL_TIMEOUT_SECONDS: float = float(os.getenv("APPROVAL_TIMEOUT_SECONDS", "1
 
 # ── Flock API (injection filter) ─────────────────────────────────────────────
 FLOCK_API_KEY: str = os.getenv("FLOCK_API_KEY", "")
-FLOCK_MODEL: str = os.getenv("FLOCK_MODEL", "gemini-2.0-flash")
+FLOCK_MODEL: str = os.getenv("FLOCK_MODEL", "gemini-3-flash-preview")
 # Score >= this threshold (and < block threshold) is suspicious but allowed.
 INJECTION_WARN_THRESHOLD: int = int(os.getenv("INJECTION_WARN_THRESHOLD", "5"))
 # Score >= this threshold → request is rejected (0-10 scale)
