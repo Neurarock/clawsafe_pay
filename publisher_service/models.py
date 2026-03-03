@@ -13,6 +13,7 @@ from transaction_builder.models import PaymentIntent, DraftTx  # noqa: F401 (re-
 class IntentResponse(BaseModel):
     intent_id: str
     status: str
+    chain: str
     message: str
 
 
@@ -23,6 +24,8 @@ class IntentStatusResponse(BaseModel):
     to_user: str
     to_address: str
     amount_wei: str
+    chain: str
+    asset: str
     note: str
     created_at: str
     updated_at: str

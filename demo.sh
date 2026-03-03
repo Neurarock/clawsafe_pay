@@ -79,8 +79,8 @@ for i in {1..20}; do
   echo -n "."
 done
 
-# ── Open dashboard ─────────────────────────────────────────────────────
-DASHBOARD_URL="http://localhost:${PORT_PUBLISHER}/dashboard"
+# ── Open homepage ──────────────────────────────────────────────────────
+DASHBOARD_URL="http://localhost:${PORT_PUBLISHER}"
 echo ""
 echo -e "${BOLD}${GREEN}Dashboard: ${DASHBOARD_URL}${NC}"
 echo -e "${CYAN}Logs:${NC}  /tmp/clawsafe_*.log"

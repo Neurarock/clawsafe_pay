@@ -8,6 +8,7 @@ from .models import PaymentIntent, DraftTx, PolicyConfig, PolicyError
 
 _CHAIN_NAME_TO_ID: dict[str, int] = {
     "sepolia": 11155111,
+    "base": 84532,       # Base Sepolia testnet
 }
 
 # Soft-warning threshold as a fraction of the hard cap multiplier

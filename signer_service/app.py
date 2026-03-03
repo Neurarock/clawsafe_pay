@@ -16,7 +16,6 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
-from web3 import Web3
 
 from signer_service import database as db
 from signer_service.models import (
@@ -75,13 +74,19 @@ async def rate_limit_middleware(request: Request, call_next):
 
 # ── Helpers ─────────────────────────────────────────────────────────────────
 
-def _format_wei(wei: str) -> str:
-    """Convert wei string to a human-readable ETH amount."""
+def _format_wei(wei: str, chain: str = "sepolia") -> str:
+    """Convert wei/smallest-unit string to a human-readable amount."""
     try:
+        from chains import get_chain
+        reg = get_chain(chain)
+        decimals = reg.config.decimals
+        symbol = reg.config.native_asset
+        amount = int(wei) / (10 ** decimals)
+        return f"{amount:.6f} {symbol}"
+    except (KeyError, ImportError):
+        # Fallback for unknown chains
         eth = int(wei) / 1e18
         return f"{eth:.6f} ETH"
-    except (ValueError, TypeError):
-        return f"{wei} wei"
 
 
 def _short_addr(addr: str) -> str:
@@ -106,8 +111,8 @@ async def _sign_workflow(tx_id: str, req: SignRequest):
 
         # Build human-readable action description
         action_desc = (
-            f"Sign transaction: send {_format_wei(req.value_wei)} "
-            f"to {_short_addr(req.to)}"
+            f"Sign transaction: send {_format_wei(req.value_wei, req.chain)} "
+            f"to {_short_addr(req.to)} on {req.chain}"
         )
         if req.note:
             action_desc += f" — {req.note}"
@@ -121,7 +126,7 @@ async def _sign_workflow(tx_id: str, req: SignRequest):
 
         if auth_status == "approved":
             db.update_status(tx_id, "approved")
-            logger.info("Tx %s approved, signing & broadcasting...", tx_id)
+            logger.info("Tx %s approved, signing & broadcasting on %s...", tx_id, req.chain)
 
             try:
                 result = await sign_transaction(
@@ -129,6 +134,7 @@ async def _sign_workflow(tx_id: str, req: SignRequest):
                     value_wei=req.value_wei,
                     data=req.data,
                     gas_limit=req.gas_limit,
+                    chain=req.chain,
                 )
                 db.update_status(
                     tx_id,
@@ -137,8 +143,8 @@ async def _sign_workflow(tx_id: str, req: SignRequest):
                     raw_signed_tx=result.raw_tx,
                 )
                 logger.info(
-                    "Tx %s BROADCAST OK: hash=%s  to=%s  value=%s",
-                    tx_id, result.tx_hash, result.to_address, result.value_wei,
+                    "Tx %s BROADCAST OK on %s: hash=%s  to=%s  value=%s",
+                    tx_id, req.chain, result.tx_hash, result.to_address, result.value_wei,
                 )
             except Exception as exc:
                 reason = str(exc)
@@ -181,9 +187,16 @@ async def sign(req: SignRequest):
     Submit a transaction for signing.
     Returns immediately; signing happens asynchronously after Telegram auth.
     """
-    # Validate address
-    if not Web3.is_address(req.to):
-        raise HTTPException(status_code=400, detail="Invalid recipient address")
+    # Validate chain is registered
+    try:
+        from chains import get_chain
+        chain_reg = get_chain(req.chain)
+    except KeyError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    # Validate address using the chain's address_regex
+    if not chain_reg.config.validate_address(req.to):
+        raise HTTPException(status_code=400, detail=f"Invalid recipient address for chain {req.chain}")
 
     # Validate amount
     try:
@@ -204,8 +217,9 @@ async def sign(req: SignRequest):
         value_wei=req.value_wei,
         data_hex=req.data,
         gas_limit=req.gas_limit,
+        chain=req.chain,
     )
-    logger.info("Sign request %s created (to=%s, value=%s)", tx_id, req.to, req.value_wei)
+    logger.info("Sign request %s created (chain=%s, to=%s, value=%s)", tx_id, req.chain, req.to, req.value_wei)
 
     # Launch background workflow
     task = asyncio.create_task(_sign_workflow(tx_id, req))
@@ -232,6 +246,7 @@ async def get_sign_status(tx_id: str):
         value_wei=row["value_wei"],
         user_id=row["user_id"],
         note=row["note"],
+        chain=row.get("chain", "sepolia"),
         auth_request_id=row["auth_request_id"] or None,
         signed_tx_hash=row.get("signed_tx_hash"),
         raw_signed_tx=row.get("raw_signed_tx"),

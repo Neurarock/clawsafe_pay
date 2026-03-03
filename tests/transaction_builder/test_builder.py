@@ -249,10 +249,10 @@ def test_payment_intent_rejects_zero_amount():
         make_intent(amount_wei="0")
 
 
-def test_payment_intent_rejects_non_sepolia_chain():
+def test_payment_intent_rejects_unsupported_chain():
     from pydantic import ValidationError
 
-    with pytest.raises(ValidationError, match="sepolia"):
+    with pytest.raises(ValidationError, match="Unsupported chain"):
         make_intent(chain="mainnet")
 
 

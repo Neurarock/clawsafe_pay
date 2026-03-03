@@ -61,12 +61,26 @@ async def run_intent_workflow(intent_id: str) -> None:
         amount_wei=row["amount_wei"],
         to_address=row["to_address"],
         note=row["note"],
+        chain=row.get("chain", "sepolia"),
+        asset=row.get("asset", "ETH"),
     )
+
+    # ── Resolve chain config ─────────────────────────────────────────────────
+    from chains import get_chain
+    try:
+        chain_reg = get_chain(intent.chain)
+        chain_cfg = chain_reg.config
+        rpc_url = chain_cfg.default_rpc_url or config.SEPOLIA_RPC_URL
+        chain_display = chain_cfg.display_name
+    except KeyError:
+        logger.warning("Chain %r not in registry, falling back to Sepolia", intent.chain)
+        rpc_url = config.SEPOLIA_RPC_URL
+        chain_display = "Sepolia Testnet"
 
     # ── Step 1: Build DraftTx ────────────────────────────────────────────────
     db.update_status(intent_id, "building")
     policy = _make_policy()
-    provider = Web3Provider(config.SEPOLIA_RPC_URL)
+    provider = Web3Provider(rpc_url)
 
     try:
         draft = await build_draft_tx(intent, provider, config.SIGNER_FROM_ADDRESS, policy)
@@ -134,8 +148,8 @@ async def run_intent_workflow(intent_id: str) -> None:
     db.update_status(intent_id, "signing")
 
     note = (
-        f"Pay {intent.amount_wei} wei ({int(intent.amount_wei)/1e18:.6f} ETH) "
-        f"to {draft.to} on Sepolia | "
+        f"Pay {intent.amount_wei} wei ({int(intent.amount_wei)/1e18:.6f} {intent.asset}) "
+        f"to {draft.to} on {chain_display} | "
         f"Reviewer: {review.verdict} | "
         f"Digest: {draft.digest[:10]}…{draft.digest[-6:]}"
     )
@@ -148,6 +162,7 @@ async def run_intent_workflow(intent_id: str) -> None:
             note=note,
             data=draft.data,
             gas_limit=draft.gas_limit,
+            chain=intent.chain,
         )
     except DownstreamError as exc:
         db.update_status(intent_id, "failed", error=f"Signer submit error: {exc}")

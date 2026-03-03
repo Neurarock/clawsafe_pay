@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS sign_requests (
     value_wei          TEXT NOT NULL,
     data_hex           TEXT NOT NULL DEFAULT '0x',
     gas_limit          INTEGER NOT NULL DEFAULT 21000,
+    chain              TEXT NOT NULL DEFAULT 'sepolia',
     status             TEXT NOT NULL DEFAULT 'pending_auth',
     signed_tx_hash     TEXT,
     raw_signed_tx      TEXT,
@@ -56,16 +57,17 @@ def insert_request(
     value_wei: str,
     data_hex: str,
     gas_limit: int,
+    chain: str = "sepolia",
 ) -> dict:
     now = datetime.now(timezone.utc).isoformat()
     with _get_conn() as conn:
         conn.execute(
             """
             INSERT INTO sign_requests
-                (tx_id, auth_request_id, user_id, note, to_address, value_wei, data_hex, gas_limit, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (tx_id, auth_request_id, user_id, note, to_address, value_wei, data_hex, gas_limit, chain, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
-            (tx_id, auth_request_id, user_id, note, to_address, value_wei, data_hex, gas_limit, now),
+            (tx_id, auth_request_id, user_id, note, to_address, value_wei, data_hex, gas_limit, chain, now),
         )
     return get_request(tx_id)  # type: ignore[return-value]
 

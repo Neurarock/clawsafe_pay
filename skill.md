@@ -1,10 +1,13 @@
 # ClawSafe Pay – Agent Skill
 
-> **Purpose**: This skill lets an OpenClaw agent send ETH payments on Sepolia
-> testnet via the ClawSafe Pay publisher_service API. The agent only needs to
-> talk to **one service** (`publisher_service`). Everything
-> else — transaction building, contract review, Telegram 2FA approval,
-> signing, and broadcasting — happens automatically behind the scenes.
+> **Purpose**: This skill lets an OpenClaw agent send payments across multiple
+> blockchains via the ClawSafe Pay publisher_service API. The agent only needs
+> to talk to **one service** (`publisher_service`). Everything else —
+> transaction building, contract review, Telegram 2FA approval, signing, and
+> broadcasting — happens automatically behind the scenes.
+>
+> **Currently active**: Sepolia testnet (ETH). Base L2, Solana, Bitcoin,
+> Zcash, and Cardano are registered as placeholders for future activation.
 
 ---
 
@@ -15,8 +18,9 @@ Base URL: http://localhost:8002
 Auth:     X-API-Key header (value from PUBLISHER_API_KEY env var)
 ```
 
-All requests and responses are JSON. Monetary values are **wei strings**
-(1 ETH = `"1000000000000000000"`).
+All requests and responses are JSON. Monetary values are **smallest-unit
+strings** (e.g. 1 ETH = `"1000000000000000000"` wei, 1 SOL = `"1000000000"`
+lamports).
 
 ---
 
@@ -42,8 +46,10 @@ POST /intent
 | `intent_id`  | string | yes      | Unique ID you generate (e.g. `"pay-017"`)         |
 | `from_user`  | string | yes      | Payer identifier (e.g. `"alice"`)                  |
 | `to_user`    | string | yes      | Payee identifier (e.g. `"bob"`)                    |
-| `amount_wei` | string | yes      | Amount in wei as a decimal string                  |
-| `to_address` | string | yes      | Recipient 0x EVM address (42 chars, hex)           |
+| `amount_wei` | string | yes      | Amount in smallest unit as a decimal string        |
+| `to_address` | string | yes      | Recipient address (format depends on chain)        |
+| `chain`      | string | no       | Target chain (default `"sepolia"`)                 |
+| `asset`      | string | no       | Asset to transfer (default `"ETH"`)                |
 | `note`       | string | no       | Human-readable memo (default `""`)                 |
 
 **Example Request**
@@ -187,19 +193,43 @@ Failure branches (terminal ❌):
 
 ---
 
-## Wei Conversion Reference
+## Unit Conversion Reference
 
-| ETH     | Wei (string)               |
-| ------- | -------------------------- |
-| 0.001   | `"1000000000000000"`       |
-| 0.01    | `"10000000000000000"`      |
-| 0.05    | `"50000000000000000"`      |
+| Chain    | Asset | Smallest Unit | Decimals | Example: 0.01 native          |
+| -------- | ----- | ------------- | -------- | ------------------------------ |
+| Sepolia  | ETH   | wei           | 18       | `"10000000000000000"`          |
+| Base     | ETH   | wei           | 18       | `"10000000000000000"`          |
+| Solana   | SOL   | lamports      | 9        | `"10000000"`                   |
+| Bitcoin  | BTC   | satoshi       | 8        | `"1000000"`                    |
+| Zcash    | ZEC   | zatoshi       | 8        | `"1000000"`                    |
+| Cardano  | ADA   | lovelace      | 6        | `"10000"`                      |
 
-Formula: `wei = ETH × 10^18`
+Tokens (USDC, USDT) use **6 decimals** on all chains:
+`1 USDC = "1000000"`
 
 **Policy limit**: The default maximum per-transaction amount is **0.05 ETH**
 (`50000000000000000` wei). Amounts above this will be rejected with a policy
 violation error.
+
+---
+
+## Supported Chains
+
+| Chain slug        | Family   | Status         | Native asset | Address format         |
+| ----------------- | -------- | -------------- | ------------ | ---------------------- |
+| `sepolia`         | EVM      | **Active**     | ETH          | `0x` + 40 hex chars    |
+| `base`            | EVM      | Placeholder    | ETH          | `0x` + 40 hex chars    |
+| `solana-devnet`   | Solana   | Placeholder    | SOL          | Base58 (32-44 chars)   |
+| `bitcoin-testnet` | UTXO     | Placeholder    | BTC          | `m`/`n`/`tb1`…         |
+| `zcash-testnet`   | UTXO     | Placeholder    | ZEC          | `tm`/`ztestsapling`…   |
+| `cardano-preprod` | Cardano  | Placeholder    | ADA          | `addr_test1`…          |
+
+## Supported Tokens
+
+| Token  | Sepolia | Base | Solana | Transfer method |
+| ------ | ------- | ---- | ------ | --------------- |
+| USDC   | ✅      | ✅   | ✅     | ERC-20 / SPL    |
+| USDT   | ✅      | ✅   | ✅     | ERC-20 / SPL    |
 
 ---
 

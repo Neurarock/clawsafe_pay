@@ -13,17 +13,21 @@ Public API:
 
 from .builder import build_draft_tx
 from .models import (
+    CHAIN_FAMILY,
     DraftTx,
     PaymentIntent,
     PolicyConfig,
     PolicyError,
     ProviderError,
     SEPOLIA_CHAIN_ID,
+    SUPPORTED_ASSETS,
+    SUPPORTED_CHAINS,
 )
 from .provider import GasEstimate, ProviderInterface, Web3Provider
 
 __all__ = [
     "build_draft_tx",
+    "CHAIN_FAMILY",
     "DraftTx",
     "GasEstimate",
     "PaymentIntent",
@@ -32,5 +36,7 @@ __all__ = [
     "ProviderError",
     "ProviderInterface",
     "SEPOLIA_CHAIN_ID",
+    "SUPPORTED_ASSETS",
+    "SUPPORTED_CHAINS",
     "Web3Provider",
 ]

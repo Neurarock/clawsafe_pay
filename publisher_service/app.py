@@ -56,7 +56,7 @@ app.add_middleware(
 # ── Rate-limit middleware ────────────────────────────────────────────────────
 
 _rate_limit_store: dict[str, list[float]] = {}
-RATE_LIMIT_MAX = 20
+RATE_LIMIT_MAX = 60
 RATE_LIMIT_WINDOW = 60.0
 
 
@@ -122,8 +122,10 @@ async def submit_intent(payload: PaymentIntent):
         to_address=payload.to_address,
         amount_wei=payload.amount_wei,
         note=payload.note,
+        chain=payload.chain,
+        asset=payload.asset,
     )
-    logger.info("Intent %s received (from=%s to=%s)", payload.intent_id, payload.from_user, payload.to_user)
+    logger.info("Intent %s received (from=%s to=%s chain=%s)", payload.intent_id, payload.from_user, payload.to_user, payload.chain)
 
     # Launch workflow in background — do not await
     asyncio.create_task(run_intent_workflow(payload.intent_id))
@@ -131,6 +133,7 @@ async def submit_intent(payload: PaymentIntent):
     return IntentResponse(
         intent_id=payload.intent_id,
         status="pending",
+        chain=payload.chain,
         message="Intent received, processing started",
     )
 
@@ -152,6 +155,8 @@ async def get_intent_status(intent_id: str):
         to_user=row["to_user"],
         to_address=row["to_address"],
         amount_wei=row["amount_wei"],
+        chain=row.get("chain", "sepolia"),
+        asset=row.get("asset", "ETH"),
         note=row["note"],
         created_at=row["created_at"],
         updated_at=row["updated_at"],
@@ -175,6 +180,8 @@ async def list_intents():
             "to_user": row["to_user"],
             "to_address": row["to_address"],
             "amount_wei": row["amount_wei"],
+            "chain": row.get("chain", "sepolia"),
+            "asset": row.get("asset", "ETH"),
             "note": row["note"],
             "tx_hash": row["tx_hash"],
             "error_message": row["error_message"],
@@ -184,10 +191,20 @@ async def list_intents():
     return results
 
 
+@app.get("/demo", response_class=HTMLResponse)
 @app.get("/dashboard", response_class=HTMLResponse)
-async def dashboard():
-    """Serve the ClawSafe Pay dashboard."""
+async def demo_dashboard():
+    """Serve the ClawSafe Pay interactive demo dashboard."""
     dashboard_path = Path(__file__).resolve().parent.parent / "dashboard" / "index.html"
     if not dashboard_path.exists():
         raise HTTPException(status_code=404, detail="Dashboard not found")
     return HTMLResponse(content=dashboard_path.read_text(), status_code=200)
+
+
+@app.get("/", response_class=HTMLResponse)
+async def homepage():
+    """Serve the ClawSafe Pay professional homepage."""
+    homepage_path = Path(__file__).resolve().parent.parent / "dashboard" / "homepage.html"
+    if not homepage_path.exists():
+        raise HTTPException(status_code=404, detail="Homepage not found")
+    return HTMLResponse(content=homepage_path.read_text(), status_code=200)
