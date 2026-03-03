@@ -180,6 +180,12 @@ async def telegram_webhook(update: TelegramUpdate):
     if not cq:
         return {"ok": True}
 
-    # delegate processing to shared handler (will also answer the callback)
-    await telegram_handler.process_callback(cq)
+    # schedule processing and return quickly so Telegram sees a fast response
+    try:
+        import asyncio
+
+        asyncio.create_task(telegram_handler.process_callback(cq))
+    except Exception:
+        logger.exception("Failed to schedule telegram callback processing")
+
     return {"ok": True}
