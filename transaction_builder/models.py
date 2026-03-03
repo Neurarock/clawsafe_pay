@@ -45,6 +45,7 @@ class PaymentIntent(BaseModel):
     asset: str = Field(default="ETH", description="Asset to transfer")
     amount_wei: str = Field(..., description="Transfer amount in smallest unit (decimal string)")
     to_address: str = Field(..., description="Recipient address")
+    from_address: str = Field(default="", description="Sender wallet address (empty = use default)")
     note: str = Field(default="", description="Human-readable memo")
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc)

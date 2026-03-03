@@ -60,6 +60,7 @@ async def run_intent_workflow(intent_id: str) -> None:
         to_user=row["to_user"],
         amount_wei=row["amount_wei"],
         to_address=row["to_address"],
+        from_address=row.get("from_address", ""),
         note=row["note"],
         chain=row.get("chain", "sepolia"),
         asset=row.get("asset", "ETH"),
@@ -82,8 +83,11 @@ async def run_intent_workflow(intent_id: str) -> None:
     policy = _make_policy()
     provider = Web3Provider(rpc_url)
 
+    # Use the wallet address from the intent, or fall back to the default
+    from_address = intent.from_address or config.SIGNER_FROM_ADDRESS
+
     try:
-        draft = await build_draft_tx(intent, provider, config.SIGNER_FROM_ADDRESS, policy)
+        draft = await build_draft_tx(intent, provider, from_address, policy)
     except PolicyError as exc:
         db.update_status(intent_id, "failed", error=f"Policy violation: {exc.reason}")
         return
@@ -163,6 +167,7 @@ async def run_intent_workflow(intent_id: str) -> None:
             data=draft.data,
             gas_limit=draft.gas_limit,
             chain=intent.chain,
+            from_address=from_address,
         )
     except DownstreamError as exc:
         db.update_status(intent_id, "failed", error=f"Signer submit error: {exc}")

@@ -23,6 +23,7 @@ class IntentStatusResponse(BaseModel):
     from_user: str
     to_user: str
     to_address: str
+    from_address: str = ""
     amount_wei: str
     chain: str
     asset: str

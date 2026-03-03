@@ -22,7 +22,17 @@ PUBLISHER_API_KEY: str = os.getenv("PUBLISHER_API_KEY", "change-me-publisher-key
 
 # ── Signer wallet ─────────────────────────────────────────────────────────────
 SIGNER_FROM_ADDRESS: str = os.getenv("SIGNER_FROM_ADDRESS", "0x0000000000000000000000000000000000000000")
-
+# All wallet addresses available for sending (loaded from WALLET_ADDR_N env vars)
+AVAILABLE_WALLETS: list[str] = []
+for _i in range(1, 20):
+    _addr = os.getenv(f"WALLET_ADDR_{_i}", "")
+    if _addr:
+        AVAILABLE_WALLETS.append(_addr)
+    else:
+        break
+# Ensure the default is always in the list
+if SIGNER_FROM_ADDRESS and SIGNER_FROM_ADDRESS not in AVAILABLE_WALLETS:
+    AVAILABLE_WALLETS.insert(0, SIGNER_FROM_ADDRESS)
 # ── RPC ───────────────────────────────────────────────────────────────────────
 SEPOLIA_RPC_URL: str = os.getenv("SEPOLIA_RPC_URL", "https://ethereum-sepolia-rpc.publicnode.com")
 

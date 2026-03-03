@@ -18,6 +18,7 @@ class SignRequest(BaseModel):
     user_id: str = Field(default="default_user", description="Identifier of the requesting user")
     note: str = Field(default="", description="Human-readable description of the transaction")
     chain: str = Field(default="sepolia", description="Target chain slug (e.g. sepolia, base)")
+    from_address: str = Field(default="", description="Sender wallet address (empty = default wallet)")
 
 
 class SignResponse(BaseModel):

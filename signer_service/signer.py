@@ -10,7 +10,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 
-from signer_service.config import WALLET_ADDRESS, WALLET_PRIVATE_KEY
+from signer_service.config import WALLET_ADDRESS, WALLET_PRIVATE_KEY, get_private_key
 
 logger = logging.getLogger("signer_service.signer")
 
@@ -32,6 +32,7 @@ async def sign_transaction(
     data: str = "0x",
     gas_limit: int = 21_000,
     chain: str = "sepolia",
+    from_address: str = "",
 ) -> SignedResult:
     """
     Build, sign, and broadcast a transaction on the specified chain.
@@ -39,9 +40,18 @@ async def sign_transaction(
     Uses the ``chains`` registry to resolve the correct provider, builder,
     and signer for the target chain. Falls back to the legacy Sepolia-only
     code path if the chain is ``sepolia`` and registry resolution fails.
+
+    If ``from_address`` is provided, the corresponding private key is
+    looked up from the wallet registry; otherwise the default wallet is used.
     """
-    if not WALLET_PRIVATE_KEY:
-        raise RuntimeError("WALLET_PRIVATE_KEY is not set in environment")
+    if from_address:
+        wallet_private_key = get_private_key(from_address)
+        wallet_address = from_address
+    else:
+        if not WALLET_PRIVATE_KEY:
+            raise RuntimeError("WALLET_PRIVATE_KEY is not set in environment")
+        wallet_private_key = WALLET_PRIVATE_KEY
+        wallet_address = WALLET_ADDRESS
 
     # Resolve chain implementation from registry
     from chains import get_chain
@@ -57,7 +67,7 @@ async def sign_transaction(
     signer = reg.signer_cls()
 
     from web3 import Web3
-    from_addr = Web3.to_checksum_address(WALLET_ADDRESS)
+    from_addr = Web3.to_checksum_address(wallet_address)
     to_addr = Web3.to_checksum_address(to)
 
     # Fetch on-chain state via the chain provider
@@ -99,7 +109,7 @@ async def sign_transaction(
     )
 
     # Sign
-    signed_tx = await signer.sign(unsigned, WALLET_PRIVATE_KEY)
+    signed_tx = await signer.sign(unsigned, wallet_private_key)
 
     # Broadcast via the chain provider
     on_chain_hash = await provider.broadcast(signed_tx.raw_tx)

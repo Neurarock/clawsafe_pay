@@ -13,6 +13,31 @@ load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 WALLET_ADDRESS: str = os.getenv("WALLET_ADDR_1", "")
 WALLET_PRIVATE_KEY: str = os.getenv("WALLET_PRIV_KEY_1", "")
 
+# Multi-wallet registry: load WALLET_ADDR_N / WALLET_PRIV_KEY_N pairs
+WALLETS: dict[str, str] = {}  # address (lower) -> private key
+for _i in range(1, 20):  # support up to 20 wallets
+    _addr = os.getenv(f"WALLET_ADDR_{_i}", "")
+    _key = os.getenv(f"WALLET_PRIV_KEY_{_i}", "")
+    if _addr and _key:
+        WALLETS[_addr.lower()] = _key
+    else:
+        break
+
+def get_wallet_addresses() -> list[str]:
+    """Return all configured wallet addresses (checksummed)."""
+    try:
+        from web3 import Web3
+        return [Web3.to_checksum_address(a) for a in WALLETS]
+    except ImportError:
+        return list(WALLETS.keys())
+
+def get_private_key(address: str) -> str:
+    """Look up the private key for a wallet address. Raises KeyError if not found."""
+    key = WALLETS.get(address.lower())
+    if not key:
+        raise KeyError(f"No private key configured for wallet {address}")
+    return key
+
 # ── Ethereum RPC ────────────────────────────────────────────────────────────
 SEPOLIA_RPC_URL: str = os.getenv(
     "SEPOLIA_RPC_URL",

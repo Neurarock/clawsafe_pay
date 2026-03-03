@@ -67,6 +67,7 @@ async def submit_to_signer(
     data: str = "0x",
     gas_limit: int = 21_000,
     chain: str = "sepolia",
+    from_address: str = "",
 ) -> SignerSubmitResponse:
     """
     POST /sign to signer_service.
@@ -83,6 +84,7 @@ async def submit_to_signer(
         "user_id": user_id,
         "note": note,
         "chain": chain,
+        "from_address": from_address,
     }
     async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
         resp = await client.post(url, json=payload)

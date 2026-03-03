@@ -342,6 +342,12 @@ tr:last-child td{border-bottom:none}
                 </select>
               </div>
             </div>
+            <div class="form-group">
+              <label>From Wallet</label>
+              <select id="f-wallet">
+                <option value="">Default wallet</option>
+              </select>
+            </div>
             <div class="form-row">
               <div class="form-group">
                 <label>From User</label>
@@ -407,6 +413,7 @@ tr:last-child td{border-bottom:none}
               <th>Chain</th>
               <th>Status</th>
               <th>From → To</th>
+              <th>From Wallet</th>
               <th>Recipient</th>
               <th>Amount</th>
               <th>Note</th>
@@ -615,6 +622,7 @@ function renderTable(data) {
       <td>${chainBadge(chain)}</td>
       <td>${statusBadge(d.status)}${errTip}</td>
       <td><strong>${d.from_user}</strong> \u2192 <strong>${d.to_user}</strong></td>
+      <td class="addr">${d.from_address ? shortAddr(d.from_address) : '\u2014 default'}</td>
       <td class="addr">${shortAddr(d.to_address)}</td>
       <td class="amount">${weiToDisplay(d.amount_wei, chain)}</td>
       <td class="note-text" title="${(d.note||'').replace(/"/g,'&quot;')}">${d.note || '\u2014'}</td>
@@ -652,6 +660,7 @@ document.getElementById('txForm').addEventListener('submit', async (e) => {
         from_user: document.getElementById('f-from').value,
         to_user: document.getElementById('f-to').value,
         to_address: document.getElementById('f-addr').value,
+        from_address: document.getElementById('f-wallet').value,
         amount_wei: amountWei,
         note: document.getElementById('f-note').value,
         chain: chain,
@@ -691,8 +700,37 @@ function startFastPoll() {
 }
 
 // Initial load + slow poll
+fetchWallets();
 fetchIntents();
 pollTimer = setInterval(fetchIntents, 10000);
+
+// ── Fetch available wallets ────────────────────────────────────────────
+async function fetchWallets() {
+  try {
+    const r = await fetch(`${API}/wallets`, { headers: { 'X-API-Key': API_KEY } });
+    if (!r.ok) return;
+    const data = await r.json();
+    const sel = document.getElementById('f-wallet');
+    sel.innerHTML = '';
+    if (data.wallets && data.wallets.length) {
+      data.wallets.forEach((addr, i) => {
+        const opt = document.createElement('option');
+        opt.value = addr;
+        const isDefault = addr.toLowerCase() === (data.default || '').toLowerCase();
+        opt.textContent = shortAddr(addr) + (isDefault ? ' (default)' : '');
+        if (isDefault) opt.selected = true;
+        sel.appendChild(opt);
+      });
+    } else {
+      const opt = document.createElement('option');
+      opt.value = '';
+      opt.textContent = 'Default wallet';
+      sel.appendChild(opt);
+    }
+  } catch (e) {
+    console.error('Failed to fetch wallets:', e);
+  }
+}
 
 // ── Particle Background ──────────────────────────────────────────────
 (function() {

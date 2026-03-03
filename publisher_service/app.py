@@ -124,8 +124,9 @@ async def submit_intent(payload: PaymentIntent):
         note=payload.note,
         chain=payload.chain,
         asset=payload.asset,
+        from_address=payload.from_address,
     )
-    logger.info("Intent %s received (from=%s to=%s chain=%s)", payload.intent_id, payload.from_user, payload.to_user, payload.chain)
+    logger.info("Intent %s received (from=%s to=%s chain=%s from_address=%s)", payload.intent_id, payload.from_user, payload.to_user, payload.chain, payload.from_address or 'default')
 
     # Launch workflow in background — do not await
     asyncio.create_task(run_intent_workflow(payload.intent_id))
@@ -154,6 +155,7 @@ async def get_intent_status(intent_id: str):
         from_user=row["from_user"],
         to_user=row["to_user"],
         to_address=row["to_address"],
+        from_address=row.get("from_address", ""),
         amount_wei=row["amount_wei"],
         chain=row.get("chain", "sepolia"),
         asset=row.get("asset", "ETH"),
@@ -179,6 +181,7 @@ async def list_intents():
             "from_user": row["from_user"],
             "to_user": row["to_user"],
             "to_address": row["to_address"],
+            "from_address": row.get("from_address", ""),
             "amount_wei": row["amount_wei"],
             "chain": row.get("chain", "sepolia"),
             "asset": row.get("asset", "ETH"),
@@ -199,6 +202,12 @@ async def demo_dashboard():
     if not dashboard_path.exists():
         raise HTTPException(status_code=404, detail="Dashboard not found")
     return HTMLResponse(content=dashboard_path.read_text(), status_code=200)
+
+
+@app.get("/wallets")
+async def list_wallets():
+    """Return all configured wallet addresses."""
+    return {"wallets": config.AVAILABLE_WALLETS, "default": config.SIGNER_FROM_ADDRESS}
 
 
 @app.get("/", response_class=HTMLResponse)

@@ -21,7 +21,7 @@ with Telegram-based two-factor approval and prompt-injection protection.
                    └───┬──────┬─────┘
             build tx   │      │  POST /sign
                        ▼      ▼
-          ┌────────────┐  ┌────────────────┐
+          ┌─────────────┐  ┌────────────────┐
           │ transaction │  │  signer_       │  :8001
           │ _builder    │  │  service       │
           │ (library)   │  └───────┬────────┘
@@ -32,10 +32,10 @@ with Telegram-based two-factor approval and prompt-injection protection.
                │  Telegram │  service       │
                │  Bot API  └────────────────┘
                ▼
-          ┌──────────┐
+          ┌───────────┐
           │ Telegram  │  Approve / Reject
           │ user      │  inline keyboard
-          └──────────┘
+          └───────────┘
 ```
 
 ### Data Flow

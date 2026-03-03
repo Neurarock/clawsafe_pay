@@ -26,7 +26,7 @@ from signer_service.models import (
 )
 from signer_service.auth_client import request_auth
 from signer_service.signer import sign_transaction
-from signer_service.config import WALLET_ADDRESS
+from signer_service.config import WALLET_ADDRESS, get_wallet_addresses
 
 logging.basicConfig(
     level=logging.INFO,
@@ -135,6 +135,7 @@ async def _sign_workflow(tx_id: str, req: SignRequest):
                     data=req.data,
                     gas_limit=req.gas_limit,
                     chain=req.chain,
+                    from_address=req.from_address,
                 )
                 db.update_status(
                     tx_id,
@@ -181,6 +182,12 @@ async def health():
     return {"status": "ok", "wallet": WALLET_ADDRESS}
 
 
+@app.get("/wallets")
+async def list_wallets():
+    """Return all configured wallet addresses."""
+    return {"wallets": get_wallet_addresses()}
+
+
 @app.post("/sign", response_model=SignResponse)
 async def sign(req: SignRequest):
     """
@@ -218,6 +225,7 @@ async def sign(req: SignRequest):
         data_hex=req.data,
         gas_limit=req.gas_limit,
         chain=req.chain,
+        from_address=req.from_address,
     )
     logger.info("Sign request %s created (chain=%s, to=%s, value=%s)", tx_id, req.chain, req.to, req.value_wei)
 

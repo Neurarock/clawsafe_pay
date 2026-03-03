@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS payment_intents (
     from_user           TEXT NOT NULL,
     to_user             TEXT NOT NULL,
     to_address          TEXT NOT NULL,
+    from_address        TEXT NOT NULL DEFAULT '',
     amount_wei          TEXT NOT NULL,
     chain               TEXT NOT NULL DEFAULT 'sepolia',
     asset               TEXT NOT NULL DEFAULT 'ETH',
@@ -70,16 +71,17 @@ def insert_intent(
     note: str,
     chain: str = "sepolia",
     asset: str = "ETH",
+    from_address: str = "",
 ) -> dict:
     now = datetime.now(timezone.utc).isoformat()
     with _get_connection() as conn:
         conn.execute(
             """
             INSERT INTO payment_intents
-              (intent_id, from_user, to_user, to_address, amount_wei, chain, asset, note, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+              (intent_id, from_user, to_user, to_address, from_address, amount_wei, chain, asset, note, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
-            (intent_id, from_user, to_user, to_address, amount_wei, chain, asset, note, now, now),
+            (intent_id, from_user, to_user, to_address, from_address, amount_wei, chain, asset, note, now, now),
         )
     return get_intent(intent_id)
 
