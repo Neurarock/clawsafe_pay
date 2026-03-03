@@ -67,16 +67,16 @@ class TestValidateIntent:
     # ── Amount cap ────────────────────────────────────────────────────────────
 
     def test_amount_over_cap_raises(self):
-        intent = make_intent(amount_wei="100000000000000000")  # 0.1 ETH > 0.05 cap
+        intent = make_intent(amount_wei="1100000000000000000")  # 1.1 ETH > 1 ETH cap
         with pytest.raises(PolicyError, match="exceeds cap"):
             validate_intent(intent, make_policy())
 
     def test_amount_exactly_at_cap_passes(self):
-        intent = make_intent(amount_wei="50000000000000000")  # exactly 0.05 ETH
+        intent = make_intent(amount_wei="1000000000000000000")  # exactly 1 ETH
         validate_intent(intent, make_policy())
 
     def test_amount_one_wei_over_cap_raises(self):
-        intent = make_intent(amount_wei="50000000000000001")
+        intent = make_intent(amount_wei="1000000000000000001")
         with pytest.raises(PolicyError, match="exceeds cap"):
             validate_intent(intent, make_policy())
 

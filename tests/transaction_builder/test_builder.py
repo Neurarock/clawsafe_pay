@@ -180,7 +180,7 @@ async def test_tip_is_capped_by_policy():
 
 @pytest.mark.asyncio
 async def test_amount_over_cap_raises_policy_error():
-    intent = make_intent(amount_wei="100000000000000000")  # 0.1 ETH > 0.05 default cap
+    intent = make_intent(amount_wei="1100000000000000000")  # 1.1 ETH > 1 ETH default cap
     with pytest.raises(PolicyError, match="exceeds cap"):
         await build_draft_tx(intent, MockProvider(), FROM_ADDRESS, default_policy())
 
