@@ -199,3 +199,9 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+./*/*.db
+/*.db
+
+/publisher_service/intents.db
+.DS_Store

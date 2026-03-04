@@ -1,7 +1,8 @@
 # ClawSafe Pay
 
 A modular, multi-service payment pipeline for Sepolia testnet ETH transfers
-with Telegram-based two-factor approval and prompt-injection protection.
+with Telegram-based two-factor approval, **multi-wallet support**, and
+prompt-injection protection.
 
 ---
 
@@ -49,9 +50,10 @@ with Telegram-based two-factor approval and prompt-injection protection.
 5. **Signer** requests Telegram approval from **user_auth** (`POST /auth/request`).
 6. **User_auth** sends an inline-keyboard prompt to Telegram and polls for the
    user's response.
-7. On **Approve**: signer signs the tx with the configured wallet private key,
-   broadcasts it to the Sepolia network via `eth_sendRawTransaction`,
-   and returns the on-chain tx hash.  On **Reject/Expire**: signer reports the status.
+7. On **Approve**: signer looks up the private key for the requested wallet
+   (or falls back to the default), signs the tx, broadcasts it to the Sepolia
+   network via `eth_sendRawTransaction`, and returns the on-chain tx hash.
+   On **Reject/Expire**: signer reports the status.
 8. **Publisher** polls `GET /sign/{tx_id}` until terminal, stores the result.
 
 > **Key principle**: The **signer_service** owns the authentication flow.
@@ -69,6 +71,22 @@ with Telegram-based two-factor approval and prompt-injection protection.
 | **publisher_service** | `8002`      | `python -m publisher_service.main`    |
 | **reviewer_service** | `8003`       | *(reserved — not yet implemented)*    |
 | **transaction_builder** | *(library)* | Imported by publisher_service       |
+
+### Multi-Wallet Support
+
+Both the signer and publisher services support **multiple wallets**. Wallets
+are configured via numbered environment variables (`WALLET_ADDR_N` /
+`WALLET_PRIV_KEY_N`, N = 1–19). Each service exposes a `GET /wallets` endpoint
+to list available wallets.
+
+When submitting a payment intent, callers can optionally pass a `from_address`
+field to select which wallet signs and pays for the transaction. If omitted,
+the default wallet (`SIGNER_FROM_ADDRESS`) is used.
+
+| Endpoint                  | Service   | Auth | Description                                    |
+| ------------------------- | --------- | ---- | ---------------------------------------------- |
+| `GET /wallets`            | publisher | none | Returns `{"wallets": [...], "default": "0x…"}` |
+| `GET /wallets`            | signer    | none | Returns `{"wallets": [...]}`                   |
 
 All ports are configurable via `.env` environment variables.
 
@@ -126,14 +144,19 @@ SIGNER_SERVICE_CALLBACK_URL=http://localhost:8001/auth/callback
 # ── SIGNER SERVICE (port 8001) ───────────────────────────────────
 SIGNER_SERVICE_PORT=8001
 USER_AUTH_URL=http://localhost:8000
-WALLET_ADDR_2=<your-sepolia-wallet-address>
-WALLET_PRIV_KEY_2=<your-private-key>
 
-# ── PUBLISHER SERVICE (port 8002) ────────────────────────────────
+# Multi-wallet: add up to 19 wallet pairs (WALLET_ADDR_N / WALLET_PRIV_KEY_N)
+WALLET_ADDR_1=<your-first-wallet-address>
+WALLET_PRIV_KEY_1=<first-wallet-private-key>
+WALLET_ADDR_2=<your-second-wallet-address>  # optional
+WALLET_PRIV_KEY_2=<second-wallet-private-key>
+# ... up to WALLET_ADDR_19 / WALLET_PRIV_KEY_19
+
+# ── PUBLISHER SERVICE (port 8002) ────────────────────────────────────
 PUBLISHER_SERVICE_PORT=8002
 PUBLISHER_API_KEY=<your-api-key>     # callers must send this as X-API-Key header
 SIGNER_SERVICE_URL=http://localhost:8001
-SIGNER_FROM_ADDRESS=<same-as-WALLET_ADDR_2>
+SIGNER_FROM_ADDRESS=<default-wallet-address>  # default sender if from_address is omitted
 SEPOLIA_RPC_URL=https://rpc.sepolia.org
 POLICY_RECIPIENT_ALLOWLIST=*         # comma-separated addresses, or * for any
 
@@ -169,7 +192,7 @@ curl -s -X POST "https://api.telegram.org/bot<TELEGRAM_BOT_TOKEN>/deleteWebhook"
 ### Via publisher_service (full pipeline)
 
 ```bash
-# Submit a payment intent
+# Submit a payment intent (uses default wallet)
 curl -s -X POST http://localhost:8002/intent \
   -H "Content-Type: application/json" \
   -H "X-API-Key: change-me-publisher-key" \
@@ -181,6 +204,23 @@ curl -s -X POST http://localhost:8002/intent \
     "to_address": "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045",
     "note": "lunch money"
   }'
+
+# Submit with a specific sender wallet
+curl -s -X POST http://localhost:8002/intent \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: change-me-publisher-key" \
+  -d '{
+    "intent_id": "pay-002",
+    "from_user": "alice",
+    "to_user": "bob",
+    "amount_wei": "10000000000000000",
+    "to_address": "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045",
+    "from_address": "0xd77E4F8142a0C48A62601cD5Be99f591D2D515da",
+    "note": "lunch money from wallet 1"
+  }'
+
+# List available wallets
+curl -s http://localhost:8002/wallets | python -m json.tool
 
 # Response: {"intent_id":"pay-001","status":"pending","message":"Intent received, processing started"}
 
@@ -219,6 +259,9 @@ pytest tests/user_auth/ -v
 pytest tests/signer_service/ -v
 pytest tests/publisher_service/ -v
 pytest tests/transaction_builder/ -v
+
+# Multi-wallet tests
+pytest tests/test_multi_wallet.py -v
 ```
 
 Tests mock all external calls (Telegram API, RPC, inter-service HTTP) — they
@@ -278,11 +321,10 @@ clawsafe_pay/
 │   └── requirements.txt
 │
 ├── contract_adviser/             # (placeholder — future contract analysis)
-├── contract_builder/             # (placeholder — future contract deployment)
-├── broadcaster_service/          # (placeholder — future tx broadcasting)
 ├── wallets/                      # (placeholder — future wallet management)
 │
 └── tests/
+    ├── test_multi_wallet.py      # Multi-wallet integration tests
     ├── user_auth/
     │   └── test_user_auth.py
     ├── signer_service/
@@ -325,6 +367,7 @@ and continues the workflow. A `BLOCK` verdict halts the pipeline immediately.
 - **Prompt-injection filter** (optional, via Flock API) scores user-controlled
   fields before processing. Score ≥ 8 → request rejected.
 - **Private keys** are only loaded by `signer_service` — no other service
-  has access to wallet keys.
+  has access to wallet keys. The multi-wallet registry maps each address to
+  its private key; the publisher service only stores wallet *addresses*.
 - **Terminal states** are immutable — once an intent reaches `confirmed`,
   `rejected`, `expired`, `blocked`, or `failed`, it cannot transition again.
