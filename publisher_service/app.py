@@ -19,6 +19,7 @@ from pathlib import Path
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse, HTMLResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 import publisher_service.config as config
 import publisher_service.database as db
@@ -539,31 +540,9 @@ async def dashboard_logo():
     return FileResponse(logo_path, media_type="image/png")
 
 
-@app.get("/static/themes.css")
-async def themes_css():
-    """Serve the shared theme CSS."""
-    css_path = Path(__file__).resolve().parent.parent / "dashboard" / "src" / "themes.css"
-    if not css_path.exists():
-        raise HTTPException(status_code=404, detail="themes.css not found")
-    return FileResponse(css_path, media_type="text/css")
-
-
-@app.get("/static/pages.css")
-async def pages_css():
-    """Serve the shared page-layout CSS."""
-    css_path = Path(__file__).resolve().parent.parent / "dashboard" / "src" / "pages.css"
-    if not css_path.exists():
-        raise HTTPException(status_code=404, detail="pages.css not found")
-    return FileResponse(css_path, media_type="text/css")
-
-
-@app.get("/static/theme-loader.js")
-async def theme_loader_js():
-    """Serve the shared theme loader JS."""
-    js_path = Path(__file__).resolve().parent.parent / "dashboard" / "src" / "theme-loader.js"
-    if not js_path.exists():
-        raise HTTPException(status_code=404, detail="theme-loader.js not found")
-    return FileResponse(js_path, media_type="application/javascript")
+# ── Static assets mount (serves dashboard/src/ as /static/) ─────────────────
+_dashboard_src = Path(__file__).resolve().parent.parent / "dashboard" / "src"
+app.mount("/static", StaticFiles(directory=str(_dashboard_src)), name="static")
 
 
 # ── Moltbook Feed Proxy ─────────────────────────────────────────────────────

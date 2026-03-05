@@ -320,6 +320,18 @@ clawsafe_pay/
 │   ├── provider.py               #   RPC provider abstraction
 │   └── requirements.txt
 │
+├── dashboard/                    # Self-contained frontend (see dashboard/README.md)
+│   ├── index.html                #   Command-center SPA (HTML only)
+│   ├── homepage.html             #   Landing page
+│   ├── security.html             #   Security architecture page
+│   ├── setup_guide.html          #   Setup guide page
+│   └── src/                      #   Static assets
+│       ├── themes.css            #     Shared theme variables (11 themes)
+│       ├── dashboard.css         #     Dashboard-specific styles
+│       ├── pages.css             #     Content-page styles
+│       ├── theme-loader.js       #     Theme persistence helper
+│       └── js/                   #     ES modules (app.js entry point)
+│
 ├── contract_adviser/             # (placeholder — future contract analysis)
 ├── wallets/                      # (placeholder — future wallet management)
 │
