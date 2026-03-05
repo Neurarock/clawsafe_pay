@@ -494,3 +494,195 @@ async def moltbook_feed():
     except Exception as e:
         logger.error("Moltbook feed fetch failed: %s", e)
         return JSONResponse(content=[], status_code=200)
+
+
+# ── Crypto Price Ticker Proxy ────────────────────────────────────────────────
+
+COINGECKO_API = "https://api.coingecko.com/api/v3"
+
+
+@app.get("/crypto-prices")
+async def crypto_prices():
+    """Proxy CoinGecko top-10 crypto prices in USD and BTC with sparkline."""
+    import httpx
+
+    try:
+        async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as client:
+            resp = await client.get(
+                f"{COINGECKO_API}/coins/markets",
+                params={
+                    "vs_currency": "usd",
+                    "order": "market_cap_desc",
+                    "per_page": 10,
+                    "page": 1,
+                    "sparkline": "true",
+                    "price_change_percentage": "24h",
+                },
+                headers={
+                    "User-Agent": "ClawSafePay/1.0 Dashboard",
+                    "Accept": "application/json",
+                },
+            )
+            resp.raise_for_status()
+            coins = resp.json()
+
+            # Fetch BTC price for conversion
+            btc_price = None
+            for c in coins:
+                if c.get("id") == "bitcoin":
+                    btc_price = c.get("current_price")
+                    break
+
+            # Add BTC-denominated price
+            result = []
+            for c in coins:
+                entry = {
+                    "id": c.get("id"),
+                    "symbol": c.get("symbol"),
+                    "name": c.get("name"),
+                    "image": c.get("image"),
+                    "current_price": c.get("current_price"),
+                    "market_cap_rank": c.get("market_cap_rank"),
+                    "price_change_percentage_24h": c.get("price_change_percentage_24h"),
+                    "market_cap": c.get("market_cap"),
+                    "total_volume": c.get("total_volume"),
+                    "sparkline_in_7d": c.get("sparkline_in_7d"),
+                }
+                if btc_price and btc_price > 0 and c.get("current_price") is not None:
+                    entry["btc_price"] = c["current_price"] / btc_price
+                result.append(entry)
+
+            return JSONResponse(content=result)
+    except Exception as e:
+        logger.error("CoinGecko fetch failed: %s", e)
+        return JSONResponse(content=[], status_code=200)
+
+
+# ── Crypto News Feed Proxy ───────────────────────────────────────────────────
+
+CRYPTO_NEWS_SOURCES = {
+    "coindesk": {
+        "rss": "https://www.coindesk.com/arc/outboundfeeds/rss/",
+        "name": "CoinDesk",
+    },
+    "cointelegraph": {
+        "rss": "https://cointelegraph.com/rss",
+        "name": "CoinTelegraph",
+    },
+    "binance": {
+        "rss": "https://www.binance.com/en/feed/rss",
+        "name": "Binance",
+    },
+}
+
+
+def _parse_rss_items(xml_text: str, source_name: str, max_items: int = 8) -> list[dict]:
+    """Parse RSS XML into article dicts. Minimal XML parsing without lxml."""
+    import xml.etree.ElementTree as ET
+
+    articles = []
+    try:
+        root = ET.fromstring(xml_text)
+        # Standard RSS 2.0 or Atom
+        items = root.findall(".//item")
+        if not items:
+            # Atom feeds
+            ns = {"atom": "http://www.w3.org/2005/Atom"}
+            items = root.findall(".//atom:entry", ns)
+
+        for item in items[:max_items]:
+            title = ""
+            link = ""
+            description = ""
+            pub_date = ""
+            author = ""
+            categories = []
+
+            for child in item:
+                tag = child.tag.split("}")[-1] if "}" in child.tag else child.tag
+                text = (child.text or "").strip()
+                if tag == "title":
+                    title = text
+                elif tag == "link":
+                    link = text or child.get("href", "")
+                elif tag == "description" or tag == "summary" or tag == "content":
+                    # Strip HTML tags for snippet
+                    import re as _re
+                    description = _re.sub(r"<[^>]+>", "", text)[:200].strip()
+                elif tag == "pubDate" or tag == "published" or tag == "updated":
+                    pub_date = text
+                elif tag in ("creator", "author"):
+                    author = text
+                    # author might have a child <name>
+                    name_el = child.find("{http://www.w3.org/2005/Atom}name") if "}" in child.tag else child.find("name")
+                    if name_el is not None and name_el.text:
+                        author = name_el.text.strip()
+                elif tag == "category":
+                    if text:
+                        categories.append(text)
+                    term = child.get("term", "")
+                    if term and term not in categories:
+                        categories.append(term)
+
+            if not title:
+                continue
+
+            articles.append({
+                "title": title,
+                "url": link,
+                "snippet": description[:160] if description else "",
+                "source": source_name,
+                "author": author,
+                "age": _format_age(pub_date) if pub_date else "",
+                "tags": categories[:4],
+            })
+    except Exception as e:
+        logger.warning("RSS parse error for %s: %s", source_name, e)
+
+    return articles
+
+
+@app.get("/crypto-news")
+async def crypto_news():
+    """Aggregate crypto news from CoinDesk, CoinTelegraph, and Binance RSS feeds."""
+    import httpx
+
+    all_articles: list[dict] = []
+
+    async with httpx.AsyncClient(timeout=12.0, follow_redirects=True) as client:
+        for key, source in CRYPTO_NEWS_SOURCES.items():
+            try:
+                resp = await client.get(source["rss"], headers={
+                    "User-Agent": "ClawSafePay/1.0 News Aggregator",
+                    "Accept": "application/rss+xml, application/xml, text/xml, */*",
+                })
+                resp.raise_for_status()
+                articles = _parse_rss_items(resp.text, source["name"])
+                all_articles.extend(articles)
+            except Exception as e:
+                logger.warning("Crypto news fetch failed for %s: %s", key, e)
+
+    # Sort by recency (articles with 'age' containing smaller time units first)
+    def _age_sort_key(a):
+        age = a.get("age", "")
+        if "just now" in age:
+            return 0
+        if "m ago" in age:
+            try:
+                return int(age.replace("m ago", ""))
+            except ValueError:
+                return 999
+        if "h ago" in age:
+            try:
+                return int(age.replace("h ago", "")) * 60
+            except ValueError:
+                return 9999
+        if "d ago" in age:
+            try:
+                return int(age.replace("d ago", "")) * 1440
+            except ValueError:
+                return 99999
+        return 99999
+
+    all_articles.sort(key=_age_sort_key)
+    return JSONResponse(content=all_articles[:20])

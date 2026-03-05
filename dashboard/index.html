@@ -55,6 +55,38 @@ html[data-theme="mint"]{
   --blue:#2563eb;--purple:#7c3aed;--pink:#db2777;
   --input-bg:rgba(255,255,255,.95);--grid-color:var(--accent);--surface-hover:rgba(16,185,129,.04);
 }
+html[data-theme="carbon"]{
+  --bg:#000000;--surface:rgba(16,16,16,.96);--surface2:rgba(24,24,24,.85);
+  --border:rgba(50,50,50,.5);--border-hi:rgba(140,140,140,.35);
+  --text:#d4d4d4;--muted:#606060;--accent:#909090;--accent2:#b8b8b8;
+  --green:#6a9f6a;--red:#b05050;--amber:#c4a050;--cyan:#7ab0c0;
+  --blue:#7ab0c0;--purple:#9a8ab5;--pink:#b8728a;
+  --input-bg:rgba(0,0,0,.95);--grid-color:rgba(60,60,60,.4);--surface-hover:rgba(255,255,255,.02);
+}
+html[data-theme="graphite"]{
+  --bg:#17181a;--surface:rgba(32,34,36,.94);--surface2:rgba(42,44,46,.82);
+  --border:rgba(65,68,72,.45);--border-hi:rgba(130,135,140,.3);
+  --text:#c8cacd;--muted:#78797c;--accent:#a0a2a5;--accent2:#c0c2c5;
+  --green:#5daf5d;--red:#d05555;--amber:#daa040;--cyan:#55b0c8;
+  --blue:#55a0d0;--purple:#a888cc;--pink:#d070a0;
+  --input-bg:rgba(14,15,16,.92);--grid-color:rgba(80,82,85,.35);--surface-hover:rgba(255,255,255,.02);
+}
+html[data-theme="ember"]{
+  --bg:#100604;--surface:rgba(26,14,10,.94);--surface2:rgba(38,22,16,.82);
+  --border:rgba(90,48,32,.4);--border-hi:rgba(245,130,70,.25);
+  --text:#f0ddd2;--muted:#907060;--accent:#e87040;--accent2:#f09060;
+  --green:#5daf5d;--red:#e85050;--amber:#f0a030;--cyan:#70b0a8;
+  --blue:#60a0d0;--purple:#b888d0;--pink:#e87090;
+  --input-bg:rgba(12,6,4,.92);--grid-color:rgba(140,60,30,.25);--surface-hover:rgba(232,112,64,.03);
+}
+html[data-theme="sakura"]{
+  --bg:#fdf2f5;--surface:rgba(255,255,255,.92);--surface2:rgba(253,242,245,.82);
+  --border:rgba(195,150,165,.28);--border-hi:rgba(215,110,140,.3);
+  --text:#2c1a22;--muted:#886070;--accent:#d76e8c;--accent2:#e890a5;
+  --green:#059669;--red:#dc2626;--amber:#d97706;--cyan:#0891b2;
+  --blue:#2563eb;--purple:#7c3aed;--pink:#db2777;
+  --input-bg:rgba(255,250,252,.96);--grid-color:rgba(215,110,140,.2);--surface-hover:rgba(215,110,140,.04);
+}
 body{font-family:'Inter','SF Pro Display',-apple-system,BlinkMacSystemFont,system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}
 ::selection{background:var(--accent);color:#fff}
 
@@ -80,7 +112,7 @@ header::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;back
 .logo{display:flex;align-items:center;gap:12px}
 .logo-icon{width:40px;height:40px;border-radius:10px;overflow:hidden;flex-shrink:0}
 .logo-icon img{width:100%;height:100%;object-fit:cover;border-radius:inherit}
-.logo h1{font-size:18px;font-weight:700;background:linear-gradient(135deg,#fff,var(--accent2),var(--cyan));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.logo h1{font-size:18px;font-weight:700;background:linear-gradient(135deg,#fff,var(--accent2),var(--cyan));-webkit-background-clip:text;-webkit-text-fill-color:var(--red)}
 .logo .sub{font-size:10px;color:var(--muted);letter-spacing:1.2px;text-transform:uppercase}
 .hdr-right{display:flex;align-items:center;gap:10px}
 .sys-badge{display:flex;align-items:center;gap:6px;padding:6px 12px;border-radius:8px;background:rgba(16,185,129,.06);border:1px solid rgba(16,185,129,.15);font-size:11px;color:var(--green);font-weight:500}
@@ -96,7 +128,7 @@ header::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;back
 .admin-banner strong{color:var(--text)}
 
 /* ── Stats Row ────────────────────────────────────────────────────── */
-.stats{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-bottom:14px}
+.stats{display:grid;grid-template-columns:repeat(auto-fill,minmax(135px,1fr));gap:8px;margin-bottom:14px}
 .stat-card{padding:10px 14px;border-radius:10px;background:var(--surface);border:1px solid var(--border);transition:all .3s;position:relative;overflow:hidden}
 .stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;opacity:0;transition:opacity .3s}
 .stat-card:nth-child(1)::before{background:linear-gradient(90deg,var(--accent),var(--purple))}
@@ -105,6 +137,8 @@ header::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;back
 .stat-card:nth-child(4)::before{background:linear-gradient(90deg,var(--red),var(--amber))}
 .stat-card:nth-child(5)::before{background:linear-gradient(90deg,var(--purple),var(--pink))}
 .stat-card:nth-child(6)::before{background:linear-gradient(90deg,var(--cyan),var(--blue))}
+.stat-card:nth-child(7)::before{background:linear-gradient(90deg,var(--green),var(--amber))}
+.stat-card:nth-child(8)::before{background:linear-gradient(90deg,var(--blue),var(--cyan))}
 .stat-card:hover{border-color:var(--border-hi);transform:translateY(-2px);box-shadow:0 6px 20px rgba(99,102,241,.1)}
 .stat-card:hover::before{opacity:1}
 .stat-label{font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:2px}
@@ -355,10 +389,91 @@ tr:last-child td{border-bottom:none}
 /* ── Right Sub-Grid (two cols) ────────────────────────────────────── */
 .right-sub{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 
+/* ── Finance Widgets ──────────────────────────────────────────────── */
+.finance-row{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:14px}
+.budget-bar-wrap{margin-bottom:10px}
+.budget-bar-label{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
+.budget-bar-name{font-size:11px;font-weight:600}
+.budget-bar-pct{font-size:10px;font-weight:700;font-variant-numeric:tabular-nums}
+.budget-bar{height:8px;border-radius:4px;background:rgba(128,128,128,.12);overflow:hidden;position:relative}
+.budget-bar-fill{height:100%;border-radius:4px;transition:width .6s ease}
+.budget-bar-fill.ok{background:linear-gradient(90deg,var(--green),var(--cyan))}
+.budget-bar-fill.warn{background:linear-gradient(90deg,var(--amber),var(--amber))}
+.budget-bar-fill.danger{background:linear-gradient(90deg,var(--red),var(--amber))}
+.budget-bar-fill.over{background:linear-gradient(90deg,var(--red),var(--pink));animation:overPulse 1.5s ease-in-out infinite}
+@keyframes overPulse{0%,100%{opacity:1}50%{opacity:.7}}
+.budget-bar-detail{font-size:9px;color:var(--muted);margin-top:2px;font-variant-numeric:tabular-nums}
+.forecast-metric{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid rgba(128,128,128,.1)}
+.forecast-metric:last-child{border-bottom:none}
+.fm-label{font-size:11px;color:var(--muted)}
+.fm-value{font-size:14px;font-weight:700;font-variant-numeric:tabular-nums}
+.fm-sub{font-size:9px;color:var(--muted);margin-top:1px}
+.cost-row{display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid rgba(128,128,128,.08)}
+.cost-row:last-child{border-bottom:none}
+.cost-label{font-size:11px;font-weight:500;min-width:65px}
+.cost-bar-wrap{flex:1;height:6px;border-radius:3px;background:rgba(128,128,128,.1);overflow:hidden}
+.cost-bar-fill{height:100%;border-radius:3px;transition:width .5s}
+.cost-value{font-size:10px;font-weight:600;min-width:75px;text-align:right;font-variant-numeric:tabular-nums}
+.trend-indicator{display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:600;padding:2px 6px;border-radius:4px}
+.trend-up{color:var(--red);background:rgba(239,68,68,.08)}
+.trend-down{color:var(--green);background:rgba(16,185,129,.08)}
+.trend-flat{color:var(--muted);background:rgba(128,128,128,.08)}
+.alert-row{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:6px;margin-bottom:6px;font-size:11px;font-weight:500}
+.alert-row.alert-warn{background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.12);color:var(--amber)}
+.alert-row.alert-danger{background:rgba(239,68,68,.06);border:1px solid rgba(239,68,68,.12);color:var(--red)}
+.alert-row.alert-ok{background:rgba(16,185,129,.06);border:1px solid rgba(16,185,129,.12);color:var(--green)}
+.kpi-mini{text-align:center;padding:8px 4px;border-radius:8px;background:rgba(128,128,128,.04);border:1px solid rgba(128,128,128,.08)}
+.kpi-mini-val{font-size:16px;font-weight:700;font-variant-numeric:tabular-nums}
+.kpi-mini-label{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-top:2px}
+.kpi-row{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
+
+/* ── Crypto Price Ticker ───────────────────────────────────────────── */
+.crypto-ticker{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px}
+.crypto-card{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;background:var(--surface2);border:1px solid var(--border);transition:all .3s;cursor:default;position:relative;overflow:hidden}
+.crypto-card:hover{border-color:var(--border-hi);transform:translateY(-2px);box-shadow:0 6px 20px rgba(99,102,241,.1)}
+.crypto-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--accent),var(--cyan));opacity:0;transition:opacity .3s}
+.crypto-card:hover::before{opacity:1}
+.crypto-icon{width:32px;height:32px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:18px;background:rgba(128,128,128,.08)}
+.crypto-icon img{width:100%;height:100%;border-radius:50%}
+.crypto-info{flex:1;min-width:0}
+.crypto-name{font-size:12px;font-weight:700;display:flex;align-items:center;gap:5px}
+.crypto-name .sym{font-size:9px;color:var(--muted);font-weight:500;text-transform:uppercase}
+.crypto-prices{display:flex;gap:8px;align-items:baseline;margin-top:1px}
+.crypto-usd{font-size:13px;font-weight:700;font-variant-numeric:tabular-nums;font-family:'JetBrains Mono','Fira Code',monospace}
+.crypto-btc{font-size:9px;color:var(--muted);font-family:'JetBrains Mono','Fira Code',monospace}
+.crypto-right{display:flex;flex-direction:column;align-items:flex-end;gap:2px}
+.crypto-change{font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;font-variant-numeric:tabular-nums}
+.crypto-change.up{color:var(--green);background:rgba(16,185,129,.1)}
+.crypto-change.down{color:var(--red);background:rgba(239,68,68,.1)}
+.crypto-sparkline{width:50px;height:20px}
+.crypto-rank{position:absolute;top:4px;right:6px;font-size:8px;color:var(--muted);opacity:.5;font-weight:600}
+
+/* ── Crypto News Feed ─────────────────────────────────────────────── */
+.news-item{padding:10px 0;border-bottom:1px solid var(--border);transition:background .15s}
+.news-item:last-child{border-bottom:none}
+.news-item:hover{background:var(--surface-hover)}
+.news-title{font-size:12px;font-weight:600;line-height:1.4;margin-bottom:4px}
+.news-title a{color:var(--text);text-decoration:none;transition:color .2s}
+.news-title a:hover{color:var(--cyan)}
+.news-meta{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:10px;color:var(--muted)}
+.news-source{padding:1px 6px;border-radius:4px;font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.3px}
+.news-source.coindesk{background:rgba(6,182,212,.1);color:var(--cyan);border:1px solid rgba(6,182,212,.15)}
+.news-source.cointelegraph{background:rgba(168,85,247,.1);color:var(--purple);border:1px solid rgba(168,85,247,.15)}
+.news-source.binance{background:rgba(245,158,11,.1);color:var(--amber);border:1px solid rgba(245,158,11,.15)}
+.news-snippet{font-size:11px;color:var(--muted);line-height:1.4;margin-top:4px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.news-tags{display:flex;gap:4px;margin-top:4px;flex-wrap:wrap}
+.news-tag{font-size:8px;padding:1px 5px;border-radius:3px;background:rgba(99,102,241,.06);color:var(--accent2);border:1px solid rgba(99,102,241,.08)}
+
+/* ── GitHub Button ────────────────────────────────────────────────── */
+.github-btn{display:flex;align-items:center;gap:5px;padding:6px 12px;border-radius:8px;background:rgba(128,128,128,.06);border:1px solid var(--border);color:var(--text);font-size:11px;font-weight:500;text-decoration:none;transition:all .2s;font-family:inherit}
+.github-btn:hover{border-color:var(--border-hi);background:rgba(128,128,128,.12);color:var(--text);transform:translateY(-1px)}
+.github-btn svg{width:14px;height:14px;fill:currentColor}
+
 /* ── Responsive ───────────────────────────────────────────────────── */
+@media(max-width:1200px){.finance-row{grid-template-columns:1fr}.crypto-ticker{grid-template-columns:repeat(auto-fill,minmax(180px,1fr))}}
 @media(max-width:1200px){.right-sub{grid-template-columns:1fr}}
 @media(max-width:1024px){.dash-grid{grid-template-columns:1fr}.stats{grid-template-columns:repeat(3,1fr)}}
-@media(max-width:768px){.stats{grid-template-columns:repeat(2,1fr)}header{flex-direction:column;gap:8px;text-align:center}.hdr-right{flex-wrap:wrap;justify-content:center}}
+@media(max-width:768px){.stats{grid-template-columns:repeat(2,1fr)}header{flex-direction:column;gap:8px;text-align:center}.hdr-right{flex-wrap:wrap;justify-content:center}.crypto-ticker{grid-template-columns:1fr 1fr}}
 </style>
 </head>
 <body>
@@ -382,7 +497,8 @@ tr:last-child td{border-bottom:none}
     <div class="hdr-right">
       <div class="sys-badge"><span class="sys-dot"></span><span id="activeChains">Sepolia · Base</span></div>
       <div class="hdr-clock" id="liveClock">00:00:00 UTC</div>
-      <a href="/" class="hdr-link">🏠 Home</a>
+      <a href="/" class="hdr-link">Home Page</a>
+      <a href="https://github.com/clawsafe/clawsafe-pay" target="_blank" rel="noopener" class="github-btn" title="View on GitHub"><svg viewBox="0 0 16 16"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>GitHub</a>
       <div class="theme-wrap">
         <button class="theme-btn" onclick="toggleThemeMenu()" title="Theme">⚙️</button>
         <div class="theme-menu" id="themeMenu">
@@ -393,6 +509,10 @@ tr:last-child td{border-bottom:none}
           <button class="theme-opt" data-theme="cloud" onclick="setTheme('cloud')"><span class="theme-swatch" style="background:#f0f4f8"></span>Cloud</button>
           <button class="theme-opt" data-theme="sand" onclick="setTheme('sand')"><span class="theme-swatch" style="background:#f5f0e8"></span>Sand</button>
           <button class="theme-opt" data-theme="mint" onclick="setTheme('mint')"><span class="theme-swatch" style="background:#ecfdf5"></span>Mint</button>
+          <button class="theme-opt" data-theme="carbon" onclick="setTheme('carbon')"><span class="theme-swatch" style="background:#000;border-color:rgba(255,255,255,.15)"></span>Carbon</button>
+          <button class="theme-opt" data-theme="graphite" onclick="setTheme('graphite')"><span class="theme-swatch" style="background:#17181a"></span>Graphite</button>
+          <button class="theme-opt" data-theme="ember" onclick="setTheme('ember')"><span class="theme-swatch" style="background:#100604"></span>Ember</button>
+          <button class="theme-opt" data-theme="sakura" onclick="setTheme('sakura')"><span class="theme-swatch" style="background:#fdf2f5"></span>Sakura</button>
         </div>
       </div>
     </div>
@@ -410,7 +530,70 @@ tr:last-child td{border-bottom:none}
     <div class="stat-card"><div class="stat-label">In Progress</div><div class="stat-value amber" id="s-pending">0</div></div>
     <div class="stat-card"><div class="stat-label">Failed</div><div class="stat-value red" id="s-failed">0</div></div>
     <div class="stat-card"><div class="stat-label">Volume (ETH)</div><div class="stat-value purple" id="s-volume">0.000</div></div>
+    <div class="stat-card"><div class="stat-label">Burn Rate</div><div class="stat-value green" id="s-burn">0.000</div><div class="stat-sub" id="s-burn-sub">ETH/day</div></div>
+    <div class="stat-card"><div class="stat-label">Budget Util</div><div class="stat-value amber" id="s-budget-pct">—</div><div class="stat-sub" id="s-budget-sub">&nbsp;</div></div>
     <div class="stat-card"><div class="stat-label">Agents</div><div class="stat-value cyan" id="s-agents">0</div><div class="stat-sub" id="s-agents-sub">&nbsp;</div></div>
+  </div>
+
+  <!-- ═══ Crypto Prices ═══ -->
+  <div class="widget" id="w-crypto-prices" style="margin-bottom:14px">
+    <div class="wh">
+      <div class="wt"><span class="wt-icon">₿</span> Crypto Prices — Top 10 <span class="live-pill">LIVE</span></div>
+      <div class="wa">
+        <button class="w-btn" onclick="fetchCryptoPrices()" title="Refresh">↻</button>
+        <button class="w-btn" onclick="toggleWidget(this)">−</button>
+      </div>
+    </div>
+    <div class="wb pad">
+      <div class="crypto-ticker" id="cryptoTicker">
+        <div class="empty-state"><div class="icon">₿</div><p>Loading crypto prices…</p></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ Finance Overview ═══ -->
+  <div class="finance-row">
+
+    <!-- 💰 Budget Tracker -->
+    <div class="widget" id="w-budget">
+      <div class="wh">
+        <div class="wt"><span class="wt-icon">💰</span> Budget Tracker</div>
+        <div class="wa"><button class="w-btn" onclick="toggleWidget(this)">−</button></div>
+      </div>
+      <div class="wb pad" style="max-height:320px">
+        <div id="budgetAlerts"></div>
+        <div id="budgetBars">
+          <div class="empty-state"><div class="icon">💰</div><p>Loading budget data…</p></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 📈 Spend Forecast -->
+    <div class="widget" id="w-forecast">
+      <div class="wh">
+        <div class="wt"><span class="wt-icon">📈</span> Spend Forecast</div>
+        <div class="wa"><button class="w-btn" onclick="toggleWidget(this)">−</button></div>
+      </div>
+      <div class="wb pad">
+        <div id="forecastContent">
+          <div class="empty-state"><div class="icon">📈</div><p>Calculating forecast…</p></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 📊 Cost Breakdown -->
+    <div class="widget" id="w-costs">
+      <div class="wh">
+        <div class="wt"><span class="wt-icon">📊</span> Cost Breakdown</div>
+        <div class="wa"><button class="w-btn" onclick="toggleWidget(this)">−</button></div>
+      </div>
+      <div class="wb pad" style="max-height:320px">
+        <div id="costBreakdown">
+          <div class="empty-state"><div class="icon">📊</div><p>No spend data yet</p></div>
+        </div>
+      </div>
+    </div>
+
   </div>
 
   <!-- ═══ Dashboard Grid ═══ -->
@@ -701,7 +884,26 @@ tr:last-child td{border-bottom:none}
 
         <!-- Sub-right -->
         <div class="dash-col">
-          <!-- 📺 YouTube Live -->
+          <!-- � Crypto News Feed -->
+          <div class="widget" id="w-crypto-news">
+            <div class="wh">
+              <div class="wt"><span class="wt-icon">📰</span> Crypto News <span class="live-pill">LIVE</span></div>
+              <div class="wa">
+                <button class="w-btn" onclick="fetchCryptoNews()" title="Reload">↻</button>
+                <button class="w-btn" onclick="toggleWidget(this)">−</button>
+              </div>
+            </div>
+            <div class="wb pad" style="max-height:340px;overflow-y:auto">
+              <div id="cryptoNewsPosts">
+                <div class="empty-state" id="cryptoNewsEmpty">
+                  <div class="icon">📰</div>
+                  <p>Loading crypto news…</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- �📺 YouTube Live -->
           <div class="widget" id="w-youtube">
             <div class="wh">
               <div class="wt"><span class="wt-icon">📺</span> Live Stream</div>
@@ -926,16 +1128,47 @@ async function fetchIntents() {
 function renderTxStats() {
   const d = state.intents;
   const total = d.length;
-  const confirmed = d.filter(x => x.status === 'confirmed').length;
+  const confirmedArr = d.filter(x => x.status === 'confirmed');
+  const confirmed = confirmedArr.length;
   const pending = d.filter(x => ['signing','pending_auth','approved','pending','building','reviewing','broadcast'].includes(x.status)).length;
   const failed = d.filter(x => ['failed','rejected','expired','blocked'].includes(x.status)).length;
-  const vol = d.filter(x => x.status === 'confirmed').reduce((s, x) => s + weiToEth(x.amount_wei), 0);
+  const vol = confirmedArr.reduce((s, x) => s + weiToEth(x.amount_wei), 0);
+
+  // Burn rate calculation
+  let burnRate = 0;
+  if (confirmedArr.length) {
+    const dates = confirmedArr.map(x => x.created_at ? x.created_at.slice(0,10) : null).filter(Boolean);
+    if (dates.length) {
+      const sorted = [...new Set(dates)].sort();
+      const firstD = new Date(sorted[0]);
+      const lastD = new Date(sorted[sorted.length - 1]);
+      const activeDays = Math.max(1, Math.ceil((lastD - firstD) / 86400000) + 1);
+      burnRate = vol / activeDays;
+    }
+  }
+
+  // Budget utilization
+  const today = new Date().toISOString().slice(0,10);
+  const todaySpend = confirmedArr.filter(x => x.created_at && x.created_at.slice(0,10) === today).reduce((s,x) => s + weiToEth(x.amount_wei), 0);
+  const totalDailyBudget = state.agents.filter(a => a.is_active && a.daily_limit_wei !== '0').reduce((s,a) => s + weiToEth(a.daily_limit_wei), 0);
+  const budgetPct = totalDailyBudget > 0 ? ((todaySpend / totalDailyBudget) * 100) : -1;
 
   animStat('s-total', total);
   animStat('s-confirmed', confirmed);
   animStat('s-pending', pending);
   animStat('s-failed', failed);
   document.getElementById('s-volume').textContent = vol.toFixed(3);
+  document.getElementById('s-burn').textContent = burnRate.toFixed(4);
+  document.getElementById('s-burn-sub').textContent = 'ETH/day';
+  const pctEl = document.getElementById('s-budget-pct');
+  if (budgetPct >= 0) {
+    pctEl.textContent = budgetPct.toFixed(0) + '%';
+    pctEl.style.color = budgetPct > 90 ? 'var(--red)' : budgetPct > 70 ? 'var(--amber)' : 'var(--green)';
+    document.getElementById('s-budget-sub').textContent = 'of daily limit';
+  } else {
+    pctEl.textContent = '—';
+    document.getElementById('s-budget-sub').textContent = 'no limits set';
+  }
   document.getElementById('txCount').textContent = total;
 }
 
@@ -1339,6 +1572,7 @@ async function fetchAllAgentIntents() {
   document.getElementById('monitorCount').textContent = total + ' txn' + (total !== 1 ? 's' : '');
 
   renderMonitor();
+  renderFinanceWidgets();
 }
 
 function renderMonitor() {
@@ -1450,6 +1684,343 @@ function renderMonitorCards(users, hideEmpty, isDeprecated = false) {
   draw();
 })();
 
+// ═══ FINANCE ANALYTICS ═══════════════════════════════════════════════
+
+function renderFinanceWidgets() {
+  renderBudgetTracker();
+  renderForecast();
+  renderCostBreakdown();
+}
+
+function renderBudgetTracker() {
+  const barsEl = document.getElementById('budgetBars');
+  const alertsEl = document.getElementById('budgetAlerts');
+  const agents = state.agents.filter(a => a.is_active);
+
+  if (!agents.length) {
+    barsEl.innerHTML = '<div class="empty-state"><div class="icon">💰</div><p>No active agents configured</p></div>';
+    alertsEl.innerHTML = '';
+    return;
+  }
+
+  const today = new Date().toISOString().slice(0, 10);
+  let alertHtml = '';
+  let barsHtml = '';
+
+  agents.forEach(agent => {
+    const intents = (state.agentIntents[agent.id] || []);
+    const todayConfirmed = intents.filter(i => i.status === 'confirmed' && i.created_at && i.created_at.slice(0,10) === today);
+    const todaySpend = todayConfirmed.reduce((s, i) => s + weiToEth(i.amount_wei || '0'), 0);
+    const totalSpend = intents.filter(i => i.status === 'confirmed').reduce((s, i) => s + weiToEth(i.amount_wei || '0'), 0);
+
+    const hasBudget = agent.daily_limit_wei !== '0';
+    const dailyBudget = hasBudget ? weiToEth(agent.daily_limit_wei) : 0;
+    const pct = hasBudget ? (todaySpend / dailyBudget) * 100 : 0;
+    const pctDisplay = hasBudget ? Math.min(pct, 999).toFixed(1) : '—';
+
+    let barClass = 'ok', pctColor = 'var(--green)';
+    if (pct > 100) { barClass = 'over'; pctColor = 'var(--red)'; }
+    else if (pct > 80) { barClass = 'danger'; pctColor = 'var(--red)'; }
+    else if (pct > 60) { barClass = 'warn'; pctColor = 'var(--amber)'; }
+
+    if (hasBudget && pct > 100) {
+      alertHtml += `<div class="alert-row alert-danger">⚠️ ${esc(agent.name)} exceeded daily budget (${pct.toFixed(0)}%)</div>`;
+    } else if (hasBudget && pct > 80) {
+      alertHtml += `<div class="alert-row alert-warn">⚠ ${esc(agent.name)} approaching budget limit (${pct.toFixed(0)}%)</div>`;
+    }
+
+    barsHtml += `<div class="budget-bar-wrap">
+      <div class="budget-bar-label">
+        <span class="budget-bar-name">${esc(agent.name)}</span>
+        <span class="budget-bar-pct" style="color:${hasBudget ? pctColor : 'var(--muted)'}">${hasBudget ? pctDisplay + '%' : 'No limit'}</span>
+      </div>
+      ${hasBudget
+        ? `<div class="budget-bar"><div class="budget-bar-fill ${barClass}" style="width:${Math.min(pct, 100)}%"></div></div>`
+        : `<div class="budget-bar"><div class="budget-bar-fill ok" style="width:0%"></div></div>`}
+      <div class="budget-bar-detail">Today: ${todaySpend.toFixed(4)} ETH${hasBudget ? ' / ' + dailyBudget.toFixed(4) + ' ETH limit' : ''} · All-time: ${totalSpend.toFixed(4)} ETH · ${intents.length} txns</div>
+    </div>`;
+  });
+
+  alertsEl.innerHTML = alertHtml;
+  barsEl.innerHTML = barsHtml || '<div class="empty-state"><div class="icon">💰</div><p>No active agents</p></div>';
+}
+
+function renderForecast() {
+  const el = document.getElementById('forecastContent');
+  const confirmed = state.intents.filter(i => i.status === 'confirmed');
+
+  if (!confirmed.length) {
+    el.innerHTML = '<div class="empty-state"><div class="icon">📈</div><p>No confirmed transactions for forecast</p></div>';
+    return;
+  }
+
+  const dailySpend = {};
+  confirmed.forEach(i => {
+    const day = i.created_at ? i.created_at.slice(0, 10) : 'unknown';
+    dailySpend[day] = (dailySpend[day] || 0) + weiToEth(i.amount_wei);
+  });
+
+  const days = Object.keys(dailySpend).sort();
+  const totalSpend = confirmed.reduce((s, i) => s + weiToEth(i.amount_wei), 0);
+  const firstDate = new Date(days[0]);
+  const lastDate = new Date(days[days.length - 1]);
+  const activeDays = Math.max(1, Math.ceil((lastDate - firstDate) / 86400000) + 1);
+
+  const dailyBurnRate = totalSpend / activeDays;
+  const weeklyProjected = dailyBurnRate * 7;
+  const monthlyProjected = dailyBurnRate * 30;
+  const quarterlyProjected = dailyBurnRate * 90;
+
+  const recentDays = days.slice(-3);
+  const prevDays = days.slice(-6, -3);
+  const recentAvg = recentDays.reduce((s, d) => s + (dailySpend[d] || 0), 0) / Math.max(recentDays.length, 1);
+  const prevAvg = prevDays.length ? prevDays.reduce((s, d) => s + (dailySpend[d] || 0), 0) / prevDays.length : recentAvg;
+
+  let trendClass = 'trend-flat', trendIcon = '→', trendLabel = 'Stable';
+  if (prevAvg > 0) {
+    const change = ((recentAvg - prevAvg) / prevAvg) * 100;
+    if (change > 10) { trendClass = 'trend-up'; trendIcon = '↑'; trendLabel = '+' + change.toFixed(0) + '%'; }
+    else if (change < -10) { trendClass = 'trend-down'; trendIcon = '↓'; trendLabel = change.toFixed(0) + '%'; }
+  }
+
+  const totalDailyBudget = state.agents.filter(a => a.is_active && a.daily_limit_wei !== '0').reduce((s, a) => s + weiToEth(a.daily_limit_wei), 0);
+  const budgetUtil = totalDailyBudget > 0 ? ((dailyBurnRate / totalDailyBudget) * 100).toFixed(1) : null;
+  const avgTxSize = totalSpend / confirmed.length;
+  const maxTx = Math.max(...confirmed.map(i => weiToEth(i.amount_wei)));
+
+  el.innerHTML = `
+    <div class="kpi-row">
+      <div class="kpi-mini"><div class="kpi-mini-val" style="color:var(--accent2)">${dailyBurnRate.toFixed(4)}</div><div class="kpi-mini-label">ETH/Day</div></div>
+      <div class="kpi-mini"><div class="kpi-mini-val" style="color:var(--purple)">${avgTxSize.toFixed(4)}</div><div class="kpi-mini-label">Avg Tx Size</div></div>
+      <div class="kpi-mini"><div class="kpi-mini-val" style="color:var(--amber)">${maxTx.toFixed(4)}</div><div class="kpi-mini-label">Largest Tx</div></div>
+    </div>
+    <div class="forecast-metric">
+      <div><div class="fm-label">Daily Burn Rate</div><div class="fm-sub">${activeDays} day${activeDays > 1 ? 's' : ''} active</div></div>
+      <div style="text-align:right"><div class="fm-value">${dailyBurnRate.toFixed(4)} <span style="font-size:10px;color:var(--muted)">ETH</span></div>
+        <span class="trend-indicator ${trendClass}">${trendIcon} ${trendLabel}</span></div>
+    </div>
+    <div class="forecast-metric">
+      <div><div class="fm-label">7-Day Projected</div></div>
+      <div class="fm-value" style="color:var(--amber)">${weeklyProjected.toFixed(4)} <span style="font-size:10px;color:var(--muted)">ETH</span></div>
+    </div>
+    <div class="forecast-metric">
+      <div><div class="fm-label">30-Day Projected</div></div>
+      <div class="fm-value" style="color:var(--purple)">${monthlyProjected.toFixed(4)} <span style="font-size:10px;color:var(--muted)">ETH</span></div>
+    </div>
+    <div class="forecast-metric">
+      <div><div class="fm-label">90-Day Projected (Quarter)</div></div>
+      <div class="fm-value" style="color:var(--cyan)">${quarterlyProjected.toFixed(4)} <span style="font-size:10px;color:var(--muted)">ETH</span></div>
+    </div>
+    <div class="forecast-metric">
+      <div><div class="fm-label">Total Confirmed Spend</div><div class="fm-sub">${confirmed.length} transactions</div></div>
+      <div class="fm-value" style="color:var(--green)">${totalSpend.toFixed(4)} <span style="font-size:10px;color:var(--muted)">ETH</span></div>
+    </div>
+    ${budgetUtil !== null ? `<div class="forecast-metric">
+      <div><div class="fm-label">Budget Utilization Rate</div><div class="fm-sub">Burn vs. ${totalDailyBudget.toFixed(4)} ETH daily limit</div></div>
+      <div class="fm-value" style="color:${parseFloat(budgetUtil) > 90 ? 'var(--red)' : parseFloat(budgetUtil) > 70 ? 'var(--amber)' : 'var(--green)'}">${budgetUtil}%</div>
+    </div>` : `<div class="forecast-metric">
+      <div><div class="fm-label">Budget Utilization</div></div>
+      <div class="fm-value" style="color:var(--muted)">— no budgets set</div>
+    </div>`}`;
+}
+
+function renderCostBreakdown() {
+  const el = document.getElementById('costBreakdown');
+  const confirmed = state.intents.filter(i => i.status === 'confirmed');
+
+  if (!confirmed.length) {
+    el.innerHTML = '<div class="empty-state"><div class="icon">📊</div><p>No confirmed spend data</p></div>';
+    return;
+  }
+
+  const byChain = {};
+  confirmed.forEach(i => {
+    const chain = i.chain || 'sepolia';
+    byChain[chain] = (byChain[chain] || 0) + weiToEth(i.amount_wei);
+  });
+
+  const byAgent = {};
+  for (const agent of state.agents) {
+    const intents = (state.agentIntents[agent.id] || []).filter(i => i.status === 'confirmed');
+    if (intents.length) {
+      byAgent[agent.name] = intents.reduce((s, i) => s + weiToEth(i.amount_wei || '0'), 0);
+    }
+  }
+
+  const totalSpend = confirmed.reduce((s, i) => s + weiToEth(i.amount_wei), 0);
+  const chainColors = { sepolia: 'var(--accent)', base: 'var(--blue)', solana: 'var(--purple)', bitcoin: 'var(--amber)', cardano: 'var(--cyan)' };
+  const agentColors = ['var(--accent)', 'var(--cyan)', 'var(--purple)', 'var(--amber)', 'var(--pink)', 'var(--green)'];
+
+  let html = '<div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:6px">By Chain</div>';
+
+  Object.entries(byChain).sort((a, b) => b[1] - a[1]).forEach(([chain, spend]) => {
+    const pct = totalSpend > 0 ? (spend / totalSpend) * 100 : 0;
+    const color = chainColors[chain] || 'var(--muted)';
+    html += `<div class="cost-row">
+      <span class="cost-label" style="color:${color}">${(CHAINS[chain] || {name: chain}).name}</span>
+      <div class="cost-bar-wrap"><div class="cost-bar-fill" style="width:${pct}%;background:${color}"></div></div>
+      <span class="cost-value">${spend.toFixed(4)} ETH</span>
+    </div>`;
+  });
+
+  if (Object.keys(byAgent).length) {
+    html += '<div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin:12px 0 6px">By Agent</div>';
+    Object.entries(byAgent).sort((a, b) => b[1] - a[1]).forEach(([name, spend], idx) => {
+      const pct = totalSpend > 0 ? (spend / totalSpend) * 100 : 0;
+      const color = agentColors[idx % agentColors.length];
+      html += `<div class="cost-row">
+        <span class="cost-label">${esc(name)}</span>
+        <div class="cost-bar-wrap"><div class="cost-bar-fill" style="width:${pct}%;background:${color}"></div></div>
+        <span class="cost-value">${spend.toFixed(4)} ETH</span>
+      </div>`;
+    });
+  }
+
+  const agentIntentIds = new Set();
+  Object.values(state.agentIntents).flat().forEach(i => { if (i.intent_id) agentIntentIds.add(i.intent_id); });
+  const adminSpend = confirmed.filter(i => !agentIntentIds.has(i.intent_id)).reduce((s, i) => s + weiToEth(i.amount_wei), 0);
+  if (adminSpend > 0) {
+    const pct = totalSpend > 0 ? (adminSpend / totalSpend) * 100 : 0;
+    html += `<div class="cost-row">
+      <span class="cost-label" style="color:var(--amber)">Admin (Direct)</span>
+      <div class="cost-bar-wrap"><div class="cost-bar-fill" style="width:${pct}%;background:var(--amber)"></div></div>
+      <span class="cost-value">${adminSpend.toFixed(4)} ETH</span>
+    </div>`;
+  }
+
+  const byAsset = {};
+  confirmed.forEach(i => {
+    const asset = i.asset || 'ETH';
+    byAsset[asset] = (byAsset[asset] || 0) + weiToEth(i.amount_wei);
+  });
+  if (Object.keys(byAsset).length > 1) {
+    html += '<div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin:12px 0 6px">By Asset</div>';
+    const assetColors = { ETH: 'var(--accent)', USDC: 'var(--green)', USDT: 'var(--cyan)', SOL: 'var(--purple)', BTC: 'var(--amber)' };
+    Object.entries(byAsset).sort((a, b) => b[1] - a[1]).forEach(([asset, spend]) => {
+      const pct = totalSpend > 0 ? (spend / totalSpend) * 100 : 0;
+      const color = assetColors[asset] || 'var(--muted)';
+      html += `<div class="cost-row">
+        <span class="cost-label" style="color:${color}">${esc(asset)}</span>
+        <div class="cost-bar-wrap"><div class="cost-bar-fill" style="width:${pct}%;background:${color}"></div></div>
+        <span class="cost-value">${spend.toFixed(4)} ETH</span>
+      </div>`;
+    });
+  }
+
+  el.innerHTML = html;
+}
+
+// ═══ CRYPTO PRICE TICKER ══════════════════════════════════════════
+
+const CRYPTO_SYMBOLS = {
+  bitcoin: { icon: '₿', name: 'Bitcoin', sym: 'BTC', color: '#f7931a' },
+  ethereum: { icon: '◆', name: 'Ethereum', sym: 'ETH', color: '#627eea' },
+  tether: { icon: '₮', name: 'Tether', sym: 'USDT', color: '#26a17b' },
+  binancecoin: { icon: '◇', name: 'BNB', sym: 'BNB', color: '#f3ba2f' },
+  solana: { icon: '◎', name: 'Solana', sym: 'SOL', color: '#9945ff' },
+  'usd-coin': { icon: '○', name: 'USD Coin', sym: 'USDC', color: '#2775ca' },
+  ripple: { icon: '✕', name: 'XRP', sym: 'XRP', color: '#00aae4' },
+  cardano: { icon: '♦', name: 'Cardano', sym: 'ADA', color: '#0033ad' },
+  dogecoin: { icon: 'Đ', name: 'Dogecoin', sym: 'DOGE', color: '#c2a633' },
+  'staked-ether': { icon: '◆', name: 'Lido stETH', sym: 'stETH', color: '#00a3ff' },
+};
+
+function drawSparkline(canvas, data, isUp) {
+  if (!canvas || !data || data.length < 2) return;
+  const ctx = canvas.getContext('2d');
+  const w = canvas.width = 50, h = canvas.height = 20;
+  ctx.clearRect(0, 0, w, h);
+  const min = Math.min(...data), max = Math.max(...data);
+  const range = max - min || 1;
+  const color = isUp ? 'rgba(16,185,129,0.8)' : 'rgba(239,68,68,0.8)';
+  const grad = ctx.createLinearGradient(0, 0, 0, h);
+  grad.addColorStop(0, isUp ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)');
+  grad.addColorStop(1, 'transparent');
+  ctx.beginPath();
+  data.forEach((v, i) => {
+    const x = (i / (data.length - 1)) * w;
+    const y = h - ((v - min) / range) * (h - 2) - 1;
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  });
+  ctx.strokeStyle = color; ctx.lineWidth = 1.2; ctx.stroke();
+  ctx.lineTo(w, h); ctx.lineTo(0, h); ctx.closePath();
+  ctx.fillStyle = grad; ctx.fill();
+}
+
+async function fetchCryptoPrices() {
+  const el = document.getElementById('cryptoTicker');
+  try {
+    const r = await fetch('/crypto-prices');
+    if (!r.ok) throw new Error(r.status);
+    const coins = await r.json();
+    if (!coins.length) { el.innerHTML = '<div class="empty-state"><div class="icon">₿</div><p>No price data available</p></div>'; return; }
+    el.innerHTML = coins.slice(0, 10).map((c, idx) => {
+      const meta = CRYPTO_SYMBOLS[c.id] || { icon: '●', name: c.name, sym: c.symbol?.toUpperCase() || '?', color: 'var(--accent)' };
+      const change = c.price_change_percentage_24h || 0;
+      const isUp = change >= 0;
+      const usd = c.current_price;
+      const btcPrice = c.btc_price;
+      const usdFmt = usd >= 1 ? '$' + usd.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2})
+        : '$' + usd.toFixed(6);
+      const btcFmt = btcPrice !== undefined ? (btcPrice < 0.0001 ? btcPrice.toExponential(2) : btcPrice.toFixed(6)) + ' BTC' : '';
+      return `<div class="crypto-card">
+        <span class="crypto-rank">#${c.market_cap_rank || idx+1}</span>
+        <div class="crypto-icon" style="background:${meta.color}15;color:${meta.color};font-weight:700;font-size:14px">
+          ${c.image ? `<img src="${c.image}" alt="${esc(c.name)}" onerror="this.outerHTML='${meta.icon}'">` : meta.icon}
+        </div>
+        <div class="crypto-info">
+          <div class="crypto-name">${esc(c.name)} <span class="sym">${meta.sym}</span></div>
+          <div class="crypto-prices">
+            <span class="crypto-usd">${usdFmt}</span>
+            ${btcFmt ? `<span class="crypto-btc">${btcFmt}</span>` : ''}
+          </div>
+        </div>
+        <div class="crypto-right">
+          <span class="crypto-change ${isUp ? 'up' : 'down'}">${isUp ? '▲' : '▼'} ${Math.abs(change).toFixed(1)}%</span>
+          <canvas class="crypto-sparkline" id="spark-${c.id}"></canvas>
+        </div>
+      </div>`;
+    }).join('');
+    // Draw sparklines
+    coins.slice(0, 10).forEach(c => {
+      const canvas = document.getElementById('spark-' + c.id);
+      const data = c.sparkline_in_7d?.price;
+      if (canvas && data) drawSparkline(canvas, data.slice(-24), (c.price_change_percentage_24h || 0) >= 0);
+    });
+  } catch (e) {
+    el.innerHTML = '<div class="empty-state"><div class="icon">⚠️</div><p>Could not load crypto prices</p></div>';
+    console.error('Crypto prices error:', e);
+  }
+}
+
+// ═══ CRYPTO NEWS FEED ═══════════════════════════════════════════
+
+async function fetchCryptoNews() {
+  const el = document.getElementById('cryptoNewsPosts');
+  try {
+    const r = await fetch('/crypto-news');
+    if (!r.ok) throw new Error(r.status);
+    const articles = await r.json();
+    if (!articles.length) { el.innerHTML = '<div class="empty-state"><div class="icon">📰</div><p>No news available</p></div>'; return; }
+    el.innerHTML = articles.map(a => {
+      const srcClass = (a.source || '').toLowerCase().replace(/[^a-z]/g, '');
+      return `<div class="news-item">
+        <div class="news-title"><a href="${esc(a.url)}" target="_blank" rel="noopener">${esc(a.title)}</a></div>
+        <div class="news-meta">
+          <span class="news-source ${srcClass}">${esc(a.source)}</span>
+          ${a.author ? `<span>👤 ${esc(a.author)}</span>` : ''}
+          ${a.age ? `<span>⏱ ${esc(a.age)}</span>` : ''}
+        </div>
+        ${a.snippet ? `<div class="news-snippet">${esc(a.snippet)}</div>` : ''}
+        ${a.tags && a.tags.length ? `<div class="news-tags">${a.tags.slice(0,4).map(t => `<span class="news-tag">${esc(t)}</span>`).join('')}</div>` : ''}
+      </div>`;
+    }).join('');
+  } catch (e) {
+    el.innerHTML = '<div class="empty-state"><div class="icon">⚠️</div><p>Could not load crypto news</p></div>';
+    console.error('Crypto news error:', e);
+  }
+}
+
 // ═══ MOLTBOOK FEED ═══════════════════════════════════════════════════
 async function fetchMoltbook() {
   const el = document.getElementById('moltbookPosts');
@@ -1481,8 +2052,13 @@ fetchWallets();
 fetchIntents();
 fetchAgents();
 fetchMoltbook();
-state.pollTimer = setInterval(fetchIntents, 10000);
+fetchCryptoPrices();
+fetchCryptoNews();
+state.pollTimer = setInterval(() => { fetchIntents(); }, 10000);
 setInterval(fetchMoltbook, 60000);
+setInterval(fetchCryptoPrices, 60000);
+setInterval(fetchCryptoNews, 120000);
+setInterval(renderFinanceWidgets, 30000);
 </script>
 </body>
 </html>
