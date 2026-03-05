@@ -70,6 +70,7 @@ prompt-injection protection.
 | **signer_service**   | `8001`       | `python -m signer_service.main`       |
 | **publisher_service** | `8002`      | `python -m publisher_service.main`    |
 | **reviewer_service** | `8003`       | *(reserved — not yet implemented)*    |
+| **dashboard**        | `8008`       | `python -m dashboard.main`            |
 | **transaction_builder** | *(library)* | Imported by publisher_service       |
 
 ### Multi-Wallet Support
@@ -123,7 +124,8 @@ python -m venv .venv && source .venv/bin/activate
 # Install all service requirements
 pip install -r publisher_service/requirements.txt \
             -r signer_service/requirements.txt \
-            -r user_auth/requirements.txt
+            -r user_auth/requirements.txt \
+            -r dashboard/requirements.txt
 
 # Install test dependencies
 pip install pytest pytest-asyncio respx
@@ -164,7 +166,7 @@ POLICY_RECIPIENT_ALLOWLIST=*         # comma-separated addresses, or * for any
 # FLOCK_API_KEY=<your-flock-key>
 ```
 
-### 4. Start Services (three terminals)
+### 4. Start Services (four terminals)
 
 ```bash
 # Terminal 1 — user_auth
@@ -175,6 +177,9 @@ python -m signer_service.main
 
 # Terminal 3 — publisher_service
 python -m publisher_service.main
+
+# Terminal 4 — dashboard
+python -m dashboard.main
 ```
 
 ### 5. Delete Telegram Webhook (for local development)
@@ -320,7 +325,11 @@ clawsafe_pay/
 │   ├── provider.py               #   RPC provider abstraction
 │   └── requirements.txt
 │
-├── dashboard/                    # Self-contained frontend (see dashboard/README.md)
+├── dashboard/                    # Standalone frontend service (port 8008, see dashboard/README.md)
+│   ├── app.py                    #   FastAPI application
+│   ├── config.py                 #   Environment config
+│   ├── main.py                   #   Uvicorn entry point
+│   ├── requirements.txt          #   Python dependencies
 │   ├── index.html                #   Command-center SPA (HTML only)
 │   ├── homepage.html             #   Landing page
 │   ├── security.html             #   Security architecture page

@@ -14,12 +14,10 @@ import json
 import logging
 import re
 from contextlib import asynccontextmanager
-from pathlib import Path
 
 from fastapi import Depends, FastAPI, HTTPException, Request
-from fastapi.responses import JSONResponse, HTMLResponse, FileResponse
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 
 import publisher_service.config as config
 import publisher_service.database as db
@@ -230,16 +228,6 @@ async def list_intents():
             "updated_at": row["updated_at"],
         })
     return results
-
-
-@app.get("/demo", response_class=HTMLResponse)
-@app.get("/dashboard", response_class=HTMLResponse)
-async def demo_dashboard():
-    """Serve the ClawSafe Pay interactive demo dashboard."""
-    dashboard_path = Path(__file__).resolve().parent.parent / "dashboard" / "index.html"
-    if not dashboard_path.exists():
-        raise HTTPException(status_code=404, detail="Dashboard not found")
-    return HTMLResponse(content=dashboard_path.read_text(), status_code=200)
 
 
 @app.get("/wallets")
@@ -487,62 +475,6 @@ async def list_agent_intents(user_id: str):
             "updated_at": row["updated_at"],
         })
     return results
-
-
-# ── Dashboard pages ──────────────────────────────────────────────────────────
-
-
-@app.get("/dashboard/api-users", response_class=HTMLResponse)
-async def api_users_dashboard():
-    """Serve the API Users management dashboard."""
-    page_path = Path(__file__).resolve().parent.parent / "dashboard" / "api_users.html"
-    if not page_path.exists():
-        raise HTTPException(status_code=404, detail="API Users dashboard not found")
-    return HTMLResponse(content=page_path.read_text(), status_code=200)
-
-
-@app.get("/", response_class=HTMLResponse)
-async def homepage():
-    """Serve the ClawSafe Pay professional homepage."""
-    homepage_path = Path(__file__).resolve().parent.parent / "dashboard" / "homepage.html"
-    if not homepage_path.exists():
-        raise HTTPException(status_code=404, detail="Homepage not found")
-    return HTMLResponse(content=homepage_path.read_text(), status_code=200)
-
-
-@app.get("/setup-guide", response_class=HTMLResponse)
-async def setup_guide():
-    """Serve the Setup Guide page."""
-    page_path = Path(__file__).resolve().parent.parent / "dashboard" / "setup_guide.html"
-    if not page_path.exists():
-        raise HTTPException(status_code=404, detail="Setup Guide not found")
-    return HTMLResponse(content=page_path.read_text(), status_code=200)
-
-
-@app.get("/security", response_class=HTMLResponse)
-async def security_page():
-    """Serve the Security Architecture page."""
-    page_path = Path(__file__).resolve().parent.parent / "dashboard" / "security.html"
-    if not page_path.exists():
-        raise HTTPException(status_code=404, detail="Security page not found")
-    return HTMLResponse(content=page_path.read_text(), status_code=200)
-
-
-# ── Static assets ────────────────────────────────────────────────────────────
-
-
-@app.get("/dashboard/logo.png")
-async def dashboard_logo():
-    """Serve the dashboard logo image."""
-    logo_path = Path(__file__).resolve().parent.parent / "dashboard" / "src" / "logo.png"
-    if not logo_path.exists():
-        raise HTTPException(status_code=404, detail="Logo not found")
-    return FileResponse(logo_path, media_type="image/png")
-
-
-# ── Static assets mount (serves dashboard/src/ as /static/) ─────────────────
-_dashboard_src = Path(__file__).resolve().parent.parent / "dashboard" / "src"
-app.mount("/static", StaticFiles(directory=str(_dashboard_src)), name="static")
 
 
 # ── Moltbook Feed Proxy ─────────────────────────────────────────────────────

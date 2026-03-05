@@ -10,6 +10,7 @@ cd "$(dirname "$0")"
 PORT_AUTH=8000
 PORT_SIGNER=8001
 PORT_PUBLISHER=8002
+PORT_DASHBOARD=8008
 
 RED='\033[0;31m'; GREEN='\033[0;32m'; CYAN='\033[0;36m'; BOLD='\033[1m'; NC='\033[0m'
 
@@ -23,7 +24,7 @@ banner() {
 
 stop_services() {
   echo -e "${RED}Stopping services...${NC}"
-  for port in $PORT_AUTH $PORT_SIGNER $PORT_PUBLISHER; do
+  for port in $PORT_AUTH $PORT_SIGNER $PORT_PUBLISHER $PORT_DASHBOARD; do
     pids=$(lsof -iTCP:${port} -sTCP:LISTEN -t 2>/dev/null || true)
     if [[ -n "$pids" ]]; then
       kill $pids 2>/dev/null || true
@@ -64,6 +65,9 @@ echo -e "  ${GREEN}✓${NC} signer_service   → http://localhost:${PORT_SIGNER}
 python -m publisher_service.main > /tmp/clawsafe_publisher.log 2>&1 &
 echo -e "  ${GREEN}✓${NC} publisher_service → http://localhost:${PORT_PUBLISHER}"
 
+python -m dashboard.main > /tmp/clawsafe_dashboard.log 2>&1 &
+echo -e "  ${GREEN}✓${NC} dashboard         → http://localhost:${PORT_DASHBOARD}"
+
 # ── Wait for health checks ────────────────────────────────────────────
 echo ""
 echo -ne "${CYAN}Waiting for services to be ready...${NC}"
@@ -72,17 +76,19 @@ for i in {1..20}; do
   h1=$(curl -sf http://localhost:${PORT_AUTH}/health 2>/dev/null || true)
   h2=$(curl -sf http://localhost:${PORT_SIGNER}/health 2>/dev/null || true)
   h3=$(curl -sf http://localhost:${PORT_PUBLISHER}/health 2>/dev/null || true)
-  if [[ -n "$h1" && -n "$h2" && -n "$h3" ]]; then
+  h4=$(curl -sf http://localhost:${PORT_DASHBOARD}/health 2>/dev/null || true)
+  if [[ -n "$h1" && -n "$h2" && -n "$h3" && -n "$h4" ]]; then
     echo -e " ${GREEN}Ready!${NC}"
     break
   fi
   echo -n "."
 done
 
-# ── Open homepage ──────────────────────────────────────────────────────
-DASHBOARD_URL="http://localhost:${PORT_PUBLISHER}"
+# ── Open dashboard ─────────────────────────────────────────────────────
+DASHBOARD_URL="http://localhost:${PORT_DASHBOARD}"
 echo ""
-echo -e "${BOLD}${GREEN}Dashboard: ${DASHBOARD_URL}${NC}"
+echo -e "${BOLD}${GREEN}Dashboard:  ${DASHBOARD_URL}${NC}"
+echo -e "${BOLD}${GREEN}Publisher:  http://localhost:${PORT_PUBLISHER}${NC}"
 echo -e "${CYAN}Logs:${NC}  /tmp/clawsafe_*.log"
 echo ""
 echo -e "${CYAN}To stop:  ${BOLD}./demo.sh stop${NC}"
@@ -95,6 +101,6 @@ elif command -v xdg-open &>/dev/null; then
   xdg-open "$DASHBOARD_URL"
 fi
 
-# Keep script alive, stream publisher logs
-echo -e "${CYAN}── Publisher log (Ctrl+C to detach) ──${NC}"
-tail -f /tmp/clawsafe_publisher.log 2>/dev/null || true
+# Keep script alive, stream dashboard logs
+echo -e "${CYAN}── Dashboard log (Ctrl+C to detach) ──${NC}"
+tail -f /tmp/clawsafe_dashboard.log 2>/dev/null || true

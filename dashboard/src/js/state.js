@@ -3,8 +3,8 @@
  * Shared state object and chain configuration used across all modules.
  */
 
-export const API = window.location.origin;
-export const API_KEY = 'change-me-publisher-key';
+export const API = window.__CLAWSAFE_API || window.location.origin;
+export const API_KEY = window.__CLAWSAFE_API_KEY || 'change-me-publisher-key';
 
 export const CHAINS = {
   sepolia: { name: 'Sepolia', asset: 'ETH', explorer: 'https://sepolia.etherscan.io/tx/', decimals: 18 },

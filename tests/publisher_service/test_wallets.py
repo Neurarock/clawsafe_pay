@@ -297,22 +297,3 @@ class TestWalletBalances:
         assert data[0]["balance_wei"] == "1000000000000000000"
         assert data[0]["balance_display"] == "1.000000"
         assert data[0]["symbol"] == "ETH"
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-#  DASHBOARD WIDGETS
-# ══════════════════════════════════════════════════════════════════════════════
-
-
-class TestDashboardWalletWidgets:
-    def test_dashboard_has_wallet_management_widget(self, client):
-        resp = client.get("/dashboard")
-        assert resp.status_code == 200
-        assert "w-wallet-mgmt" in resp.text
-        assert "Wallet Management" in resp.text
-
-    def test_dashboard_has_wallet_balance_widget(self, client):
-        resp = client.get("/dashboard")
-        assert resp.status_code == 200
-        assert "w-balances" in resp.text
-        assert "Wallet Balances" in resp.text

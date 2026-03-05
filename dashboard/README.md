@@ -1,6 +1,7 @@
 # ClawSafe Pay — Dashboard Frontend
 
-Self-contained frontend for the ClawSafe Pay demo dashboard, served by `publisher_service` on port **8002**.
+Standalone frontend service for the ClawSafe Pay demo dashboard, running on port **8008**.
+All API calls go cross-origin to the `publisher_service` on port **8002**.
 
 ---
 
@@ -8,7 +9,12 @@ Self-contained frontend for the ClawSafe Pay demo dashboard, served by `publishe
 
 ```
 dashboard/
-├── index.html              # Main command-center SPA (~570 lines, HTML only)
+├── app.py                  # FastAPI application (page routes + static mount)
+├── config.py               # Environment config (ports, publisher URL)
+├── main.py                 # Uvicorn entry point (python -m dashboard.main)
+├── requirements.txt        # Python dependencies
+├── __init__.py
+├── index.html              # Main command-center SPA (~575 lines, HTML only)
 ├── homepage.html            # Professional landing page
 ├── security.html            # Security architecture page
 ├── setup_guide.html         # Setup / installation guide
@@ -40,19 +46,23 @@ dashboard/
 
 The dashboard is a **vanilla HTML / CSS / JS** frontend with no build step. All JavaScript is split into ES modules (`type="module"`) that import from each other via relative paths.
 
+The service is a lightweight FastAPI app (`dashboard/app.py`) that serves the HTML pages and static assets. A `/config.js` endpoint dynamically injects the publisher service URL so the frontend knows where the backend API lives.
+
 ### Serving
 
-`publisher_service/app.py` serves the dashboard:
+`dashboard/app.py` serves the following routes:
 
-| URL | File |
-| --- | ---- |
+| URL | File / Handler |
+| --- | -------------- |
 | `/` | `homepage.html` |
 | `/dashboard`, `/demo` | `index.html` |
 | `/setup-guide` | `setup_guide.html` |
 | `/security` | `security.html` |
 | `/dashboard/api-users` | `api_users.html` (redirect) |
+| `/config.js` | Dynamic JS with publisher API URL |
 | `/static/*` | `src/` directory (StaticFiles mount) |
 | `/dashboard/logo.png` | `src/logo.png` |
+| `/health` | Health check |
 
 ### Theming
 
@@ -63,27 +73,40 @@ Themes: **midnight** (default), slate, ocean, cloud, sand, mint, carbon, graphit
 
 ---
 
+## Configuration
+
+Environment variables (set in `.env` at the project root):
+
+| Variable | Default | Description |
+| -------- | ------- | ----------- |
+| `DASHBOARD_PORT` | `8008` | Port the dashboard service listens on |
+| `PUBLISHER_API_URL` | `http://localhost:8002` | Publisher service base URL |
+| `PUBLISHER_API_KEY` | `change-me-publisher-key` | API key injected into frontend config |
+
+---
+
 ## Local Development
 
 ### Prerequisites
 
 - Python 3.11+ with a virtual environment
-- All service dependencies installed (see root README)
+- Publisher service running on port 8002 (for API calls)
 
 ### Quick Start
 
 ```bash
 # From the project root
-./demo.sh            # starts all three services + opens the browser
+./demo.sh            # starts all four services + opens the browser
 ./demo.sh stop       # tears down
 ```
 
-Or start just the publisher service:
+Or start just the dashboard service:
 
 ```bash
 source .venv/bin/activate
-python -m publisher_service.main
-# Dashboard at http://localhost:8002/dashboard
+pip install -r dashboard/requirements.txt
+python -m dashboard.main
+# Dashboard at http://localhost:8008/dashboard
 ```
 
 ### Editing
