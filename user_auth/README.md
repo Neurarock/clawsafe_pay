@@ -234,8 +234,6 @@ Single table `auth_requests` in SQLite:
    Look for `"chat": {"id": 123456789}`.
 5. Put that ID in `TELEGRAM_CHAT_ID`.
 
----
-
 ## Project Structure
 
 ```

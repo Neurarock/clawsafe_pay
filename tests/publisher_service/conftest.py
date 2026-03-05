@@ -35,4 +35,7 @@ def patch_config(tmp_path, monkeypatch):
     # Re-patch the database module's imported constant too
     import publisher_service.database as db_module
     monkeypatch.setattr(db_module, "DATABASE_PATH", db_path)
+    # Also patch api_users_db to use the same temp DB
+    import publisher_service.api_users_db as api_users_db_module
+    monkeypatch.setattr(api_users_db_module, "DATABASE_PATH", db_path)
     yield
