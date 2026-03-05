@@ -1,18 +1,20 @@
-# ClawSafe Pay — Dashboard Frontend
+# ClawSafe Pay — Frontend (Dashboard)
 
 Standalone frontend service for the ClawSafe Pay demo dashboard, running on port **8008**.
-All API calls go cross-origin to the `publisher_service` on port **8002**.
+Payment API calls go cross-origin to the `publisher_service` on port **8002**.
+Feed proxies (crypto prices, crypto news, Moltbook) are served directly by this service.
 
 ---
 
 ## Directory Structure
 
 ```
-dashboard/
-├── app.py                  # FastAPI application (page routes + static mount)
+frontend/
+├── app.py                  # FastAPI app (page routes, feed proxies, static mount)
 ├── config.py               # Environment config (ports, publisher URL)
-├── main.py                 # Uvicorn entry point (python -m dashboard.main)
+├── main.py                 # Uvicorn entry point (python -m frontend.main)
 ├── requirements.txt        # Python dependencies
+├── Dockerfile              # Container image
 ├── __init__.py
 ├── index.html              # Main command-center SPA (~575 lines, HTML only)
 ├── homepage.html            # Professional landing page
@@ -50,7 +52,7 @@ The service is a lightweight FastAPI app (`dashboard/app.py`) that serves the HT
 
 ### Serving
 
-`dashboard/app.py` serves the following routes:
+`frontend/app.py` serves the following routes:
 
 | URL | File / Handler |
 | --- | -------------- |
@@ -60,6 +62,9 @@ The service is a lightweight FastAPI app (`dashboard/app.py`) that serves the HT
 | `/security` | `security.html` |
 | `/dashboard/api-users` | `api_users.html` (redirect) |
 | `/config.js` | Dynamic JS with publisher API URL |
+| `/crypto-prices` | Proxy → CoinGecko API |
+| `/crypto-news` | Proxy → RSS aggregation |
+| `/moltbook-feed` | Proxy → Moltbook API |
 | `/static/*` | `src/` directory (StaticFiles mount) |
 | `/dashboard/logo.png` | `src/logo.png` |
 | `/health` | Health check |
@@ -100,12 +105,12 @@ Environment variables (set in `.env` at the project root):
 ./demo.sh stop       # tears down
 ```
 
-Or start just the dashboard service:
+Or start just the frontend service:
 
 ```bash
 source .venv/bin/activate
-pip install -r dashboard/requirements.txt
-python -m dashboard.main
+pip install -r frontend/requirements.txt
+python -m frontend.main
 # Dashboard at http://localhost:8008/dashboard
 ```
 
@@ -127,7 +132,10 @@ python -m dashboard.main
 
 ## API Dependencies
 
-The dashboard communicates with the publisher service REST API:
+The dashboard communicates with the publisher service REST API for payment
+operations, and serves feed data (crypto prices, news, Moltbook) directly:
+
+**Publisher API (cross-origin to port 8002):**
 
 | Method | Endpoint | Purpose |
 | ------ | -------- | ------- |
@@ -145,8 +153,13 @@ The dashboard communicates with the publisher service REST API:
 | `DELETE` | `/wallets/:id` | Remove wallet |
 | `POST` | `/wallets/:id/set-default` | Set default wallet |
 | `GET` | `/wallets/balances` | Live balances |
-| `GET` | `/crypto-prices` | Top 10 crypto prices |
-| `GET` | `/crypto-news` | Crypto news articles |
-| `GET` | `/moltbook-feed` | Moltbook finance feed |
 
-All requests include the header `X-API-Key: <publisher-admin-key>`.
+**Frontend-local feed proxies (same origin on port 8008):**
+
+| Method | Endpoint | Upstream |
+| ------ | -------- | -------- |
+| `GET` | `/crypto-prices` | CoinGecko `/coins/markets` |
+| `GET` | `/crypto-news` | CoinDesk / CoinTelegraph / Binance RSS |
+| `GET` | `/moltbook-feed` | Moltbook `/api/v1/posts` |
+
+All publisher requests include the header `X-API-Key: <publisher-admin-key>`.

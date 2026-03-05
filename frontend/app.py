@@ -16,13 +16,13 @@ from fastapi.responses import HTMLResponse, FileResponse, JSONResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-import dashboard.config as config
+import frontend.config as config
 
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(name)s] %(levelname)s  %(message)s",
 )
-logger = logging.getLogger("dashboard.app")
+logger = logging.getLogger("frontend.app")
 
 _DASHBOARD_DIR = Path(__file__).resolve().parent
 _SRC_DIR = _DASHBOARD_DIR / "src"

@@ -1,0 +1,91 @@
+# ── ClawSafe Pay — Docker Compose ─────────────────────────────────────
+#
+# Usage:
+#   docker compose up --build        # start all services
+#   docker compose down               # stop and remove containers
+#   docker compose logs -f frontend   # stream frontend logs
+#
+
+services:
+  # ── Telegram 2FA auth service ────────────────────────────────────────
+  user_auth:
+    build:
+      context: .
+      dockerfile: backend/user_auth/Dockerfile
+    ports:
+      - "${AUTH_SERVICE_PORT:-8000}:8000"
+    env_file: .env
+    environment:
+      AUTH_SERVICE_HOST: "0.0.0.0"
+      AUTH_SERVICE_PORT: "8000"
+      SIGNER_SERVICE_CALLBACK_URL: "http://signer:8001/auth/callback"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+  # ── Transaction signer ───────────────────────────────────────────────
+  signer:
+    build:
+      context: .
+      dockerfile: backend/signer_service/Dockerfile
+    ports:
+      - "${SIGNER_SERVICE_PORT:-8001}:8001"
+    env_file: .env
+    environment:
+      SIGNER_SERVICE_HOST: "0.0.0.0"
+      SIGNER_SERVICE_PORT: "8001"
+      USER_AUTH_URL: "http://user_auth:8000"
+    depends_on:
+      user_auth:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+  # ── Payment intent orchestrator ──────────────────────────────────────
+  publisher:
+    build:
+      context: .
+      dockerfile: backend/publisher_service/Dockerfile
+    ports:
+      - "${PUBLISHER_SERVICE_PORT:-8002}:8002"
+    env_file: .env
+    environment:
+      PUBLISHER_SERVICE_PORT: "8002"
+      SIGNER_SERVICE_URL: "http://signer:8001"
+    depends_on:
+      signer:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8002/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+  # ── Dashboard frontend ──────────────────────────────────────────────
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    ports:
+      - "${DASHBOARD_PORT:-8008}:8008"
+    env_file: .env
+    environment:
+      DASHBOARD_PORT: "8008"
+      PUBLISHER_API_URL: "http://publisher:8002"
+    depends_on:
+      publisher:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8008/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s

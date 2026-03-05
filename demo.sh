@@ -49,6 +49,9 @@ else
   exit 1
 fi
 
+# ── Set PYTHONPATH so backend packages resolve correctly ───────────────
+export PYTHONPATH="backend:${PYTHONPATH:-}"
+
 # ── Stop any existing services ─────────────────────────────────────────
 stop_services
 sleep 1
@@ -65,8 +68,8 @@ echo -e "  ${GREEN}✓${NC} signer_service   → http://localhost:${PORT_SIGNER}
 python -m publisher_service.main > /tmp/clawsafe_publisher.log 2>&1 &
 echo -e "  ${GREEN}✓${NC} publisher_service → http://localhost:${PORT_PUBLISHER}"
 
-python -m dashboard.main > /tmp/clawsafe_dashboard.log 2>&1 &
-echo -e "  ${GREEN}✓${NC} dashboard         → http://localhost:${PORT_DASHBOARD}"
+python -m frontend.main > /tmp/clawsafe_dashboard.log 2>&1 &
+echo -e "  ${GREEN}✓${NC} frontend          → http://localhost:${PORT_DASHBOARD}"
 
 # ── Wait for health checks ────────────────────────────────────────────
 echo ""

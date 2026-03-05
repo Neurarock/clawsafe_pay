@@ -1,5 +1,5 @@
 """
-Tests for the dashboard frontend service.
+Tests for the frontend service (formerly dashboard).
 
 Covers:
 - Health check
@@ -10,13 +10,14 @@ Covers:
 - Config.js endpoint
 - Static assets (/static/themes.css, /static/theme-loader.js, /dashboard/logo.png)
 - API Users redirect page
+- Feed proxy endpoints (/crypto-prices, /crypto-news, /moltbook-feed)
 """
 from __future__ import annotations
 
 import pytest
 from fastapi.testclient import TestClient
 
-from dashboard.app import app
+from frontend.app import app
 
 
 @pytest.fixture
@@ -289,3 +290,21 @@ class TestApiUsersDashboard:
         resp = client.get("/dashboard/api-users")
         assert resp.status_code == 200
         assert "text/html" in resp.headers["content-type"]
+
+
+# ── Feed Proxy Endpoints ─────────────────────────────────────────────────────
+
+class TestFeedProxyEndpoints:
+    """Proxy endpoints that were moved from publisher_service to frontend."""
+
+    def test_crypto_prices_returns_200(self, client):
+        resp = client.get("/crypto-prices")
+        assert resp.status_code == 200
+
+    def test_crypto_news_returns_200(self, client):
+        resp = client.get("/crypto-news")
+        assert resp.status_code == 200
+
+    def test_moltbook_feed_returns_200(self, client):
+        resp = client.get("/moltbook-feed")
+        assert resp.status_code == 200

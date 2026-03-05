@@ -2,10 +2,10 @@
 Tests for publisher_service page routes.
 
 After the dashboard was extracted into its own service (port 8008),
-the publisher_service no longer serves HTML pages or static assets.
-These tests verify that the old page routes now return 404 (or are simply gone).
+the publisher_service no longer serves HTML pages, static assets,
+or feed proxies. These tests verify those routes now return 404.
 
-The actual dashboard page/asset tests live in tests/dashboard/test_pages.py.
+The actual dashboard page/asset/feed tests live in tests/frontend/test_pages.py.
 """
 from __future__ import annotations
 
@@ -62,6 +62,12 @@ class TestPublisherNoLongerServesPages:
         resp = client.get("/dashboard/logo.png")
         assert resp.status_code == 404
 
+    def test_feed_proxies_not_served(self, client):
+        """Feed proxy endpoints were moved to the frontend service."""
+        assert client.get("/crypto-prices").status_code == 404
+        assert client.get("/crypto-news").status_code == 404
+        assert client.get("/moltbook-feed").status_code == 404
+
 
 class TestPublisherApiStillWorks:
     """Core API endpoints remain on the publisher service."""
@@ -74,15 +80,3 @@ class TestPublisherApiStillWorks:
     def test_intents_requires_auth(self, client):
         resp = client.get("/intents")
         assert resp.status_code in (401, 403, 422)
-
-    def test_crypto_prices_returns_200(self, client):
-        resp = client.get("/crypto-prices")
-        assert resp.status_code == 200
-
-    def test_crypto_news_returns_200(self, client):
-        resp = client.get("/crypto-news")
-        assert resp.status_code == 200
-
-    def test_moltbook_feed_returns_200(self, client):
-        resp = client.get("/moltbook-feed")
-        assert resp.status_code == 200

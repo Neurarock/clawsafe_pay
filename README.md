@@ -70,7 +70,7 @@ prompt-injection protection.
 | **signer_service**   | `8001`       | `python -m signer_service.main`       |
 | **publisher_service** | `8002`      | `python -m publisher_service.main`    |
 | **reviewer_service** | `8003`       | *(reserved — not yet implemented)*    |
-| **dashboard**        | `8008`       | `python -m dashboard.main`            |
+| **frontend**         | `8008`       | `python -m frontend.main`             |
 | **transaction_builder** | *(library)* | Imported by publisher_service       |
 
 ### Multi-Wallet Support
@@ -122,10 +122,10 @@ cd clawsafe_pay
 python -m venv .venv && source .venv/bin/activate
 
 # Install all service requirements
-pip install -r publisher_service/requirements.txt \
-            -r signer_service/requirements.txt \
-            -r user_auth/requirements.txt \
-            -r dashboard/requirements.txt
+pip install -r backend/publisher_service/requirements.txt \
+            -r backend/signer_service/requirements.txt \
+            -r backend/user_auth/requirements.txt \
+            -r frontend/requirements.txt
 
 # Install test dependencies
 pip install pytest pytest-asyncio respx
@@ -169,6 +169,9 @@ POLICY_RECIPIENT_ALLOWLIST=*         # comma-separated addresses, or * for any
 ### 4. Start Services (four terminals)
 
 ```bash
+# Set PYTHONPATH for backend packages
+export PYTHONPATH=backend:$PYTHONPATH
+
 # Terminal 1 — user_auth
 python -m user_auth.main
 
@@ -178,8 +181,14 @@ python -m signer_service.main
 # Terminal 3 — publisher_service
 python -m publisher_service.main
 
-# Terminal 4 — dashboard
-python -m dashboard.main
+# Terminal 4 — frontend
+python -m frontend.main
+```
+
+### Docker Compose (alternative)
+
+```bash
+docker compose up --build
 ```
 
 ### 5. Delete Telegram Webhook (for local development)
@@ -281,56 +290,67 @@ clawsafe_pay/
 ├── .env                          # Environment variables (all services)
 ├── pytest.ini                    # pytest configuration
 ├── README.md                     # This file
+├── demo.sh                       # One-line demo launcher
+├── docker-compose.yml            # Docker orchestration
 │
-├── user_auth/                    # Telegram 2FA auth service (port 8000)
-│   ├── app.py                    #   FastAPI endpoints
+├── backend/                      # All backend services & libraries
+│   ├── user_auth/                # Telegram 2FA auth service (port 8000)
+│   │   ├── app.py                #   FastAPI endpoints
+│   │   ├── config.py             #   Environment config
+│   │   ├── database.py           #   SQLite persistence
+│   │   ├── main.py               #   Uvicorn entry point
+│   │   ├── models.py             #   Pydantic models
+│   │   ├── security.py           #   HMAC verification
+│   │   ├── signer_callback.py    #   Notify signer of auth result
+│   │   ├── telegram_bot.py       #   Send/edit Telegram messages
+│   │   ├── telegram_handler.py   #   Process callback queries
+│   │   ├── telegram_poller.py    #   Long-polling fallback
+│   │   ├── Dockerfile
+│   │   └── requirements.txt
+│   │
+│   ├── signer_service/           # Transaction signer (port 8001)
+│   │   ├── app.py                #   FastAPI endpoints + background workflow
+│   │   ├── auth_client.py        #   HTTP client for user_auth
+│   │   ├── config.py             #   Environment config
+│   │   ├── database.py           #   SQLite persistence
+│   │   ├── main.py               #   Uvicorn entry point
+│   │   ├── models.py             #   Pydantic models
+│   │   ├── security.py           #   HMAC computation
+│   │   ├── signer.py             #   EIP-1559 tx signing + broadcast
+│   │   ├── Dockerfile
+│   │   └── requirements.txt
+│   │
+│   ├── publisher_service/        # Payment intent orchestrator (port 8002)
+│   │   ├── app.py                #   FastAPI endpoints
+│   │   ├── clients.py            #   HTTP clients (reviewer, signer)
+│   │   ├── config.py             #   Environment config
+│   │   ├── database.py           #   SQLite persistence
+│   │   ├── injection_filter.py   #   Flock API prompt-injection detector
+│   │   ├── main.py               #   Uvicorn entry point
+│   │   ├── models.py             #   Pydantic models
+│   │   ├── orchestrator.py       #   Background workflow state machine
+│   │   ├── security.py           #   API-key verification
+│   │   ├── Dockerfile
+│   │   └── requirements.txt
+│   │
+│   ├── transaction_builder/      # Unsigned tx construction (library)
+│   │   ├── builder.py            #   build_draft_tx()
+│   │   ├── models.py             #   PaymentIntent, DraftTx, PolicyConfig
+│   │   ├── policy.py             #   Pre/post-build policy checks
+│   │   ├── provider.py           #   RPC provider abstraction
+│   │   └── requirements.txt
+│   │
+│   ├── chains/                   # Multi-chain support (EVM, Solana, Bitcoin, …)
+│   ├── contract_adviser/         # (placeholder — future contract analysis)
+│   └── wallets/                  # (placeholder — future wallet management)
+│
+├── frontend/                     # Dashboard frontend service (port 8008)
+│   ├── app.py                    #   FastAPI app + feed proxies
 │   ├── config.py                 #   Environment config
-│   ├── database.py               #   SQLite persistence
 │   ├── main.py                   #   Uvicorn entry point
-│   ├── models.py                 #   Pydantic models
-│   ├── security.py               #   HMAC verification
-│   ├── signer_callback.py        #   Notify signer of auth result
-│   ├── telegram_bot.py           #   Send/edit Telegram messages
-│   ├── telegram_handler.py       #   Process callback queries
-│   ├── telegram_poller.py        #   Long-polling fallback
-│   └── requirements.txt
-│
-├── signer_service/               # Transaction signer (port 8001)
-│   ├── app.py                    #   FastAPI endpoints + background workflow
-│   ├── auth_client.py            #   HTTP client for user_auth
-│   ├── config.py                 #   Environment config
-│   ├── database.py               #   SQLite persistence
-│   ├── main.py                   #   Uvicorn entry point
-│   ├── models.py                 #   Pydantic models
-│   ├── security.py               #   HMAC computation
-│   ├── signer.py                 #   EIP-1559 tx signing + broadcast (web3 + eth-account)
-│   └── requirements.txt
-│
-├── publisher_service/            # Payment intent orchestrator (port 8002)
-│   ├── app.py                    #   FastAPI endpoints
-│   ├── clients.py                #   HTTP clients (reviewer, signer)
-│   ├── config.py                 #   Environment config
-│   ├── database.py               #   SQLite persistence
-│   ├── injection_filter.py       #   Flock API prompt-injection detector
-│   ├── main.py                   #   Uvicorn entry point
-│   ├── models.py                 #   Pydantic models
-│   ├── orchestrator.py           #   Background workflow state machine
-│   ├── security.py               #   API-key verification
-│   └── requirements.txt
-│
-├── transaction_builder/          # Unsigned tx construction (library)
-│   ├── builder.py                #   build_draft_tx()
-│   ├── models.py                 #   PaymentIntent, DraftTx, PolicyConfig
-│   ├── policy.py                 #   Pre/post-build policy checks
-│   ├── provider.py               #   RPC provider abstraction
-│   └── requirements.txt
-│
-├── dashboard/                    # Standalone frontend service (port 8008, see dashboard/README.md)
-│   ├── app.py                    #   FastAPI application
-│   ├── config.py                 #   Environment config
-│   ├── main.py                   #   Uvicorn entry point
+│   ├── Dockerfile
 │   ├── requirements.txt          #   Python dependencies
-│   ├── index.html                #   Command-center SPA (HTML only)
+│   ├── index.html                #   Command-center SPA
 │   ├── homepage.html             #   Landing page
 │   ├── security.html             #   Security architecture page
 │   ├── setup_guide.html          #   Setup guide page
@@ -341,11 +361,10 @@ clawsafe_pay/
 │       ├── theme-loader.js       #     Theme persistence helper
 │       └── js/                   #     ES modules (app.js entry point)
 │
-├── contract_adviser/             # (placeholder — future contract analysis)
-├── wallets/                      # (placeholder — future wallet management)
-│
 └── tests/
     ├── test_multi_wallet.py      # Multi-wallet integration tests
+    ├── frontend/
+    │   └── test_pages.py
     ├── user_auth/
     │   └── test_user_auth.py
     ├── signer_service/
@@ -356,7 +375,9 @@ clawsafe_pay/
     │   ├── test_clients.py
     │   ├── test_injection_filter.py
     │   ├── test_injection_filter_live.py
-    │   └── test_orchestrator.py
+    │   ├── test_orchestrator.py
+    │   ├── test_pages.py
+    │   └── test_wallets.py
     └── transaction_builder/
         ├── conftest.py
         ├── test_builder.py
