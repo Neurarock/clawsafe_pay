@@ -26,6 +26,28 @@ It accepts a `PaymentIntent`, builds a draft Sepolia transaction, gets reviewer 
 
 All intent endpoints require `X-API-Key`.
 
+### Wallet Management (admin-only)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/wallets` | List all wallet addresses (DB + env-configured). No auth required. |
+| `POST` | `/wallets` | Add a wallet (address + private key). Encrypted at rest. Admin key required. |
+| `GET` | `/wallets/managed` | List all DB-managed wallets (no private keys exposed). Admin key required. |
+| `DELETE` | `/wallets/{wallet_id}` | Delete a wallet by ID. Admin key required. |
+| `POST` | `/wallets/{wallet_id}/set-default` | Set a wallet as the default sending wallet. Admin key required. |
+| `GET` | `/wallets/balances` | Fetch on-chain ETH balances for all wallets via RPC. No auth required. |
+
+**Private key security:**
+- Private keys are encrypted with XOR + SHA-256 derived key before storage in SQLite.
+- The encryption secret is configured via the `WALLET_ENC_SECRET` environment variable.
+- Private keys are **never** returned by any API endpoint.
+- For production, use a proper KMS (AWS KMS, HashiCorp Vault, etc.) instead of the built-in encryption.
+
+**Wallet sources:**
+- **DB wallets** — added via `POST /wallets`, stored in the `wallets` SQLite table.
+- **Env wallets** — loaded from `WALLET_ADDR_N` environment variables at startup (read-only).
+- The `GET /wallets` endpoint merges both sources, with DB wallets taking priority.
+
 ## State Machine
 
 Normal path:
@@ -60,6 +82,10 @@ Terminal error/decision states:
 - `app.py` - FastAPI routes + middleware
 - `orchestrator.py` - workflow/state transitions
 - `clients.py` - downstream HTTP calls
-- `database.py` - SQLite persistence
+- `database.py` - SQLite persistence (payment intents)
+- `wallets_db.py` - SQLite persistence (wallet management)
+- `wallet_models.py` - Pydantic models for wallet endpoints
+- `api_users_db.py` - SQLite persistence (API user/agent management)
+- `api_user_models.py` - Pydantic models for API user endpoints
 - `security.py` - API key + HMAC helpers
 - `config.py` - env-based configuration

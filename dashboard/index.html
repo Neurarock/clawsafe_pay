@@ -102,7 +102,8 @@ body{font-family:'Inter','SF Pro Display',-apple-system,BlinkMacSystemFont,syste
 #particles{position:fixed;inset:0;z-index:0;pointer-events:none}
 
 /* ── App Container ────────────────────────────────────────────────── */
-.app{position:relative;z-index:1;max-width:1440px;margin:0 auto;padding:16px 20px 40px}
+.app{position:relative;z-index:1;max-width:1440px;margin:0 auto;padding:16px 20px 40px;display:flex;flex-direction:column;align-items:center}
+.app>*{width:100%}
 
 /* ── Header ───────────────────────────────────────────────────────── */
 header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;padding:14px 20px;
@@ -129,8 +130,8 @@ header::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;back
 .admin-banner strong{color:var(--text)}
 
 /* ── Stats Row ────────────────────────────────────────────────────── */
-.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px}
-.stat-card{padding:10px 14px;border-radius:10px;background:var(--surface);border:1px solid var(--border);transition:all .3s;position:relative;overflow:hidden}
+.stats{display:grid;grid-template-columns:repeat(8,1fr);gap:6px;margin-bottom:10px}
+.stat-card{padding:8px 10px;border-radius:10px;background:var(--surface);border:1px solid var(--border);transition:all .3s;position:relative;overflow:hidden}
 .stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;opacity:0;transition:opacity .3s}
 .stat-card:nth-child(1)::before{background:linear-gradient(90deg,var(--accent),var(--purple))}
 .stat-card:nth-child(2)::before{background:linear-gradient(90deg,var(--green),var(--cyan))}
@@ -143,7 +144,7 @@ header::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;back
 .stat-card:hover{border-color:var(--border-hi);transform:translateY(-2px);box-shadow:0 6px 20px rgba(99,102,241,.1)}
 .stat-card:hover::before{opacity:1}
 .stat-label{font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:2px}
-.stat-value{font-size:20px;font-weight:700;font-variant-numeric:tabular-nums}
+.stat-value{font-size:18px;font-weight:700;font-variant-numeric:tabular-nums}
 .stat-sub{font-size:9px;color:var(--muted);margin-top:1px}
 .green{color:var(--green)}.red{color:var(--red)}.amber{color:var(--amber)}.blue{color:var(--blue)}.purple{color:var(--purple)}.cyan{color:var(--cyan)}
 
@@ -170,7 +171,7 @@ header::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;back
 .w-count{font-size:10px;font-weight:600;padding:2px 8px;border-radius:6px;background:rgba(99,102,241,.08);color:var(--accent2);border:1px solid rgba(99,102,241,.12)}
 
 /* ── Dashboard Grid ───────────────────────────────────────────────── */
-.dash-grid{display:grid;grid-template-columns:380px 1fr 280px;gap:14px;margin-bottom:14px}
+.dash-grid{display:grid;grid-template-columns:380px 1fr;gap:10px;margin-bottom:10px}
 .dash-col{display:flex;flex-direction:column;gap:14px}
 
 /* ── Form Elements ────────────────────────────────────────────────── */
@@ -391,7 +392,8 @@ tr:last-child td{border-bottom:none}
 .right-sub{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 
 /* ── Finance Widgets ──────────────────────────────────────────────── */
-.finance-row{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;margin-bottom:14px}
+/* ── Bottom Row: Crypto + Finance ──────────────────────────────────── */
+
 .budget-bar-wrap{margin-bottom:10px}
 .budget-bar-label{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
 .budget-bar-name{font-size:11px;font-weight:600}
@@ -471,11 +473,32 @@ tr:last-child td{border-bottom:none}
 .github-btn:hover{border-color:var(--border-hi);background:rgba(128,128,128,.12);color:var(--text);transform:translateY(-1px)}
 .github-btn svg{width:14px;height:14px;fill:currentColor}
 
+/* ── Wallet Management ────────────────────────────────────────────── */
+.wallet-card{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:8px;background:var(--surface);border:1px solid var(--border);margin-bottom:6px;transition:all .2s}
+.wallet-card:hover{border-color:var(--border-hi);background:var(--surface-hover)}
+.wallet-card.is-default{border-color:var(--accent);background:rgba(99,102,241,.04)}
+.wallet-icon{font-size:18px;flex-shrink:0}
+.wallet-info{flex:1;min-width:0}
+.wallet-addr{font-size:11px;font-family:'JetBrains Mono','Fira Code',monospace;color:var(--cyan);word-break:break-all}
+.wallet-meta{display:flex;gap:6px;align-items:center;margin-top:2px;font-size:10px;color:var(--muted)}
+.wallet-label-tag{padding:1px 5px;border-radius:3px;background:rgba(99,102,241,.08);color:var(--accent2);font-size:9px;font-weight:600}
+.wallet-default-tag{padding:1px 5px;border-radius:3px;background:rgba(16,185,129,.1);color:var(--green);font-size:9px;font-weight:600}
+.wallet-actions{display:flex;gap:4px;flex-shrink:0}
+
+/* ── Wallet Balances ──────────────────────────────────────────────── */
+.balance-card{display:flex;align-items:center;gap:10px;padding:10px;border-radius:8px;background:var(--surface);border:1px solid var(--border);margin-bottom:6px;transition:all .2s}
+.balance-card:hover{border-color:var(--border-hi)}
+.balance-icon{width:32px;height:32px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:16px;background:rgba(99,102,241,.08)}
+.balance-info{flex:1;min-width:0}
+.balance-addr{font-size:10px;font-family:'JetBrains Mono','Fira Code',monospace;color:var(--muted)}
+.balance-label{font-size:11px;font-weight:600;color:var(--text)}
+.balance-amount{text-align:right}
+.balance-value{font-size:14px;font-weight:700;font-family:'JetBrains Mono','Fira Code',monospace;color:var(--green)}
+.balance-symbol{font-size:10px;color:var(--muted);font-weight:500}
+
 /* ── Responsive ───────────────────────────────────────────────────── */
-@media(max-width:1400px){.dash-grid{grid-template-columns:380px 1fr}.dash-col-prices{display:none}}
-@media(max-width:1200px){.finance-row{grid-template-columns:1fr}}
 @media(max-width:1200px){.right-sub{grid-template-columns:1fr}}
-@media(max-width:1024px){.dash-grid{grid-template-columns:1fr}.stats{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:1024px){.dash-grid{grid-template-columns:1fr}.stats{grid-template-columns:repeat(4,1fr)}}
 @media(max-width:768px){.stats{grid-template-columns:repeat(2,1fr)}header{flex-direction:column;gap:8px;text-align:center}.hdr-right{flex-wrap:wrap;justify-content:center}}
 </style>
 </head>
@@ -536,38 +559,6 @@ tr:last-child td{border-bottom:none}
     <div class="stat-card"><div class="stat-label">Burn Rate</div><div class="stat-value green" id="s-burn">0.000</div><div class="stat-sub" id="s-burn-sub">ETH/day</div></div>
     <div class="stat-card"><div class="stat-label">Budget Util</div><div class="stat-value amber" id="s-budget-pct">—</div><div class="stat-sub" id="s-budget-sub">&nbsp;</div></div>
     <div class="stat-card"><div class="stat-label">Agents</div><div class="stat-value cyan" id="s-agents">0</div><div class="stat-sub" id="s-agents-sub">&nbsp;</div></div>
-  </div>
-
-  <!-- ═══ Finance Overview ═══ -->
-  <div class="finance-row">
-
-    <!-- 💰 Budget Tracker -->
-    <div class="widget" id="w-budget">
-      <div class="wh">
-        <div class="wt"><span class="wt-icon">💰</span> Budget Tracker</div>
-        <div class="wa"><button class="w-btn" onclick="toggleWidget(this)">−</button></div>
-      </div>
-      <div class="wb pad" style="max-height:320px">
-        <div id="budgetAlerts"></div>
-        <div id="budgetBars">
-          <div class="empty-state"><div class="icon">💰</div><p>Loading budget data…</p></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- 📈 Spend Forecast -->
-    <div class="widget" id="w-forecast">
-      <div class="wh">
-        <div class="wt"><span class="wt-icon">📈</span> Spend Forecast</div>
-        <div class="wa"><button class="w-btn" onclick="toggleWidget(this)">−</button></div>
-      </div>
-      <div class="wb pad">
-        <div id="forecastContent">
-          <div class="empty-state"><div class="icon">📈</div><p>Calculating forecast…</p></div>
-        </div>
-      </div>
-    </div>
-
   </div>
 
   <!-- ═══ Dashboard Grid ═══ -->
@@ -712,7 +703,79 @@ tr:last-child td{border-bottom:none}
         </div>
       </div>
 
-      <!-- 📖 Quick Guide -->
+      <!-- � Wallet Management -->
+      <div class="widget" id="w-wallet-mgmt">
+        <div class="wh">
+          <div class="wt"><span class="wt-icon">👛</span> Wallet Management <span class="w-count" id="walletCount">0</span></div>
+          <div class="wa">
+            <button class="w-btn" onclick="fetchManagedWallets()" title="Refresh">↻</button>
+            <button class="w-btn" onclick="toggleWidget(this)">−</button>
+          </div>
+        </div>
+        <div class="wb pad">
+          <form id="walletForm" autocomplete="off">
+            <div class="form-stack">
+              <div class="form-group">
+                <label>Wallet Address</label>
+                <input type="text" id="wl-address" class="addr-input" placeholder="0x..." required>
+              </div>
+              <div class="form-group">
+                <label>Private Key</label>
+                <div style="position:relative">
+                  <input type="password" id="wl-privkey" placeholder="0x..." required style="padding-right:36px">
+                  <button type="button" class="w-btn" onclick="togglePrivKeyVisibility()" title="Show/Hide"
+                    style="position:absolute;right:4px;top:50%;transform:translateY(-50%);font-size:12px" id="wl-eye">👁</button>
+                </div>
+                <div class="form-hint" style="color:var(--amber)">⚠️ Encrypted at rest — never leaves the server</div>
+              </div>
+              <div class="form-row">
+                <div class="form-group">
+                  <label>Label</label>
+                  <input type="text" id="wl-label" placeholder="e.g. Hot Wallet 1">
+                </div>
+                <div class="form-group">
+                  <label>Chain</label>
+                  <select id="wl-chain">
+                    <option value="sepolia" selected>Sepolia</option>
+                    <option value="base">Base</option>
+                    <option value="solana">Solana</option>
+                    <option value="bitcoin">Bitcoin</option>
+                    <option value="cardano">Cardano</option>
+                  </select>
+                </div>
+              </div>
+              <button type="submit" class="btn btn-primary" style="width:100%" id="wlAddBtn">👛 Add Wallet</button>
+            </div>
+          </form>
+          <div id="walletList" style="margin-top:10px">
+            <div class="empty-state" id="walletEmpty">
+              <div class="icon">👛</div>
+              <p>No wallets added yet</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 💎 Wallet Balances -->
+      <div class="widget" id="w-balances">
+        <div class="wh">
+          <div class="wt"><span class="wt-icon">💎</span> Wallet Balances <span class="live-pill">LIVE</span></div>
+          <div class="wa">
+            <button class="w-btn" onclick="fetchWalletBalances()" title="Refresh">↻</button>
+            <button class="w-btn" onclick="toggleWidget(this)">−</button>
+          </div>
+        </div>
+        <div class="wb pad" style="max-height:340px;overflow-y:auto">
+          <div id="balancesList">
+            <div class="empty-state" id="balancesEmpty">
+              <div class="icon">💎</div>
+              <p>Loading wallet balances…</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- �📖 Quick Guide -->
       <div class="widget" id="w-guide">
         <div class="wh">
           <div class="wt"><span class="wt-icon">📖</span> Quick Guide</div>
@@ -854,6 +917,36 @@ tr:last-child td{border-bottom:none}
               </div>
             </div>
           </div>
+
+          <!-- 💰 Budget Tracker -->
+          <div class="widget" id="w-budget">
+            <div class="wh">
+              <div class="wt"><span class="wt-icon">💰</span> Budget Tracker</div>
+              <div class="wa"><button class="w-btn" onclick="toggleWidget(this)">−</button></div>
+            </div>
+            <div class="wb pad">
+              <div id="budgetAlerts"></div>
+              <div id="budgetBars">
+                <div class="empty-state"><div class="icon">💰</div><p>Loading budget data…</p></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ₿ Top 10 Crypto -->
+          <div class="widget" id="w-crypto-prices">
+            <div class="wh">
+              <div class="wt"><span class="wt-icon">₿</span> Top 10 Crypto <span class="live-pill">LIVE</span></div>
+              <div class="wa">
+                <button class="w-btn" onclick="fetchCryptoPrices()" title="Refresh">↻</button>
+                <button class="w-btn" onclick="toggleWidget(this)">−</button>
+              </div>
+            </div>
+            <div class="wb pad" style="overflow-y:auto">
+              <div class="crypto-ticker" id="cryptoTicker">
+                <div class="empty-state"><div class="icon">₿</div><p>Loading prices…</p></div>
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- Sub-right -->
@@ -905,29 +998,24 @@ tr:last-child td{border-bottom:none}
               </div>
             </div>
           </div>
+
+          <!-- 📈 Spend Forecast -->
+          <div class="widget" id="w-forecast">
+            <div class="wh">
+              <div class="wt"><span class="wt-icon">📈</span> Spend Forecast</div>
+              <div class="wa"><button class="w-btn" onclick="toggleWidget(this)">−</button></div>
+            </div>
+            <div class="wb pad">
+              <div id="forecastContent">
+                <div class="empty-state"><div class="icon">📈</div><p>Calculating forecast…</p></div>
+              </div>
+            </div>
+          </div>
         </div>
 
       </div><!-- /right-sub -->
 
     </div><!-- /dash-col right -->
-
-    <!-- ── Right Sidebar: Crypto Prices ── -->
-    <div class="dash-col dash-col-prices">
-      <div class="widget" id="w-crypto-prices">
-        <div class="wh">
-          <div class="wt"><span class="wt-icon">₿</span> Top 10 Crypto <span class="live-pill">LIVE</span></div>
-          <div class="wa">
-            <button class="w-btn" onclick="fetchCryptoPrices()" title="Refresh">↻</button>
-            <button class="w-btn" onclick="toggleWidget(this)">−</button>
-          </div>
-        </div>
-        <div class="wb pad" style="overflow-y:auto">
-          <div class="crypto-ticker" id="cryptoTicker">
-            <div class="empty-state"><div class="icon">₿</div><p>Loading prices…</p></div>
-          </div>
-        </div>
-      </div>
-    </div>
 
   </div><!-- /dash-grid -->
 
@@ -1312,6 +1400,194 @@ async function fetchWallets() {
       sel.innerHTML = '<option value="">Default wallet</option>';
     }
   } catch (e) { console.error('Fetch wallets:', e); }
+}
+
+// ═══ WALLET MANAGEMENT ═══════════════════════════════════════════════
+
+state.managedWallets = [];
+
+async function fetchManagedWallets() {
+  try {
+    const r = await fetch(`${API}/wallets/managed`, { headers: { 'X-API-Key': API_KEY } });
+    if (!r.ok) return;
+    state.managedWallets = await r.json();
+    renderWalletList();
+  } catch (e) { console.error('Fetch managed wallets:', e); }
+}
+
+function renderWalletList() {
+  const container = document.getElementById('walletList');
+  const empty = document.getElementById('walletEmpty');
+  const count = document.getElementById('walletCount');
+  count.textContent = state.managedWallets.length;
+
+  if (!state.managedWallets.length) {
+    empty.style.display = 'block';
+    container.innerHTML = '';
+    container.appendChild(empty);
+    return;
+  }
+  empty.style.display = 'none';
+
+  container.innerHTML = state.managedWallets.map(w => `
+    <div class="wallet-card ${w.is_default ? 'is-default' : ''}">
+      <div class="wallet-icon">👛</div>
+      <div class="wallet-info">
+        <div class="wallet-addr">${esc(w.address)}</div>
+        <div class="wallet-meta">
+          ${w.label ? `<span class="wallet-label-tag">${esc(w.label)}</span>` : ''}
+          ${w.is_default ? '<span class="wallet-default-tag">★ DEFAULT</span>' : ''}
+          <span>${esc(w.chain)}</span>
+        </div>
+      </div>
+      <div class="wallet-actions">
+        ${!w.is_default ? `<button class="w-btn" onclick="setDefaultWallet('${esc(w.id)}')" title="Set as default">★</button>` : ''}
+        <button class="w-btn" onclick="deleteWallet('${esc(w.id)}')" title="Delete" style="color:var(--red)">✕</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+document.getElementById('walletForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const btn = document.getElementById('wlAddBtn');
+  btn.disabled = true;
+  btn.textContent = 'Adding…';
+
+  try {
+    const r = await fetch(`${API}/wallets`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-API-Key': API_KEY },
+      body: JSON.stringify({
+        address: document.getElementById('wl-address').value.trim(),
+        private_key: document.getElementById('wl-privkey').value.trim(),
+        label: document.getElementById('wl-label').value.trim(),
+        chain: document.getElementById('wl-chain').value,
+      }),
+    });
+    const data = await r.json();
+    if (r.ok) {
+      toast('✓ Wallet added', 'success');
+      document.getElementById('walletForm').reset();
+      fetchManagedWallets();
+      fetchWallets();
+      fetchWalletBalances();
+    } else {
+      toast(`✗ ${data.detail || JSON.stringify(data)}`, 'error');
+    }
+  } catch (err) {
+    toast(`✗ Network error: ${err.message}`, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '👛 Add Wallet';
+  }
+});
+
+async function deleteWallet(walletId) {
+  if (!confirm('Delete this wallet? This cannot be undone.')) return;
+  try {
+    const r = await fetch(`${API}/wallets/${walletId}`, {
+      method: 'DELETE',
+      headers: { 'X-API-Key': API_KEY },
+    });
+    if (r.ok) {
+      toast('Wallet deleted', 'success');
+      fetchManagedWallets();
+      fetchWallets();
+      fetchWalletBalances();
+    } else {
+      const data = await r.json();
+      toast(`✗ ${data.detail || 'Delete failed'}`, 'error');
+    }
+  } catch (err) { toast(`✗ ${err.message}`, 'error'); }
+}
+
+async function setDefaultWallet(walletId) {
+  try {
+    const r = await fetch(`${API}/wallets/${walletId}/set-default`, {
+      method: 'POST',
+      headers: { 'X-API-Key': API_KEY },
+    });
+    if (r.ok) {
+      toast('Default wallet updated', 'success');
+      fetchManagedWallets();
+      fetchWallets();
+    } else {
+      const data = await r.json();
+      toast(`✗ ${data.detail || 'Failed'}`, 'error');
+    }
+  } catch (err) { toast(`✗ ${err.message}`, 'error'); }
+}
+
+function togglePrivKeyVisibility() {
+  const input = document.getElementById('wl-privkey');
+  const eye = document.getElementById('wl-eye');
+  if (input.type === 'password') {
+    input.type = 'text';
+    eye.textContent = '🙈';
+  } else {
+    input.type = 'password';
+    eye.textContent = '👁';
+  }
+}
+
+// ═══ WALLET BALANCES ═════════════════════════════════════════════════
+
+async function fetchWalletBalances() {
+  try {
+    const r = await fetch(`${API}/wallets/balances`, { headers: { 'X-API-Key': API_KEY } });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const balances = await r.json();
+    renderWalletBalances(balances);
+  } catch (e) {
+    console.error('Fetch balances:', e);
+    const el = document.getElementById('balancesList');
+    el.innerHTML = '<div class="empty-state"><div class="icon">⚠️</div><p>Could not load balances</p></div>';
+  }
+}
+
+function renderWalletBalances(balances) {
+  const el = document.getElementById('balancesList');
+  const empty = document.getElementById('balancesEmpty');
+
+  if (!balances.length) {
+    empty.style.display = 'block';
+    el.innerHTML = '';
+    el.appendChild(empty);
+    return;
+  }
+  empty.style.display = 'none';
+
+  // Calculate total
+  let totalEth = 0;
+  balances.forEach(b => {
+    if (b.balance_display !== 'error') totalEth += parseFloat(b.balance_display);
+  });
+
+  let html = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;padding:4px 0;border-bottom:1px solid var(--border)">
+    <span style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:600">${balances.length} wallet${balances.length !== 1 ? 's' : ''}</span>
+    <span style="font-size:12px;font-weight:700;color:var(--green);font-family:'JetBrains Mono','Fira Code',monospace">${totalEth.toFixed(6)} ETH total</span>
+  </div>`;
+
+  html += balances.map(b => {
+    const isError = b.balance_display === 'error';
+    const balFloat = isError ? 0 : parseFloat(b.balance_display);
+    const valColor = isError ? 'var(--red)' : balFloat > 0 ? 'var(--green)' : 'var(--muted)';
+
+    return `<div class="balance-card">
+      <div class="balance-icon">💎</div>
+      <div class="balance-info">
+        <div class="balance-label">${b.label || shortAddr(b.address)}</div>
+        <div class="balance-addr">${shortAddr(b.address)} · ${esc(b.chain)}</div>
+      </div>
+      <div class="balance-amount">
+        <div class="balance-value" style="color:${valColor}">${isError ? 'Error' : b.balance_display}</div>
+        <div class="balance-symbol">${isError ? '' : b.symbol}</div>
+      </div>
+    </div>`;
+  }).join('');
+
+  el.innerHTML = html;
 }
 
 // ═══ AGENTS ══════════════════════════════════════════════════════════
@@ -1819,6 +2095,7 @@ function renderForecast() {
 
 function renderCostBreakdown() {
   const el = document.getElementById('costBreakdown');
+  if (!el) return;
   const confirmed = state.intents.filter(i => i.status === 'confirmed');
 
   if (!confirmed.length) {
@@ -2042,6 +2319,8 @@ async function fetchMoltbook() {
 
 // ═══ INIT ════════════════════════════════════════════════════════════
 fetchWallets();
+fetchManagedWallets();
+fetchWalletBalances();
 fetchIntents();
 fetchAgents();
 fetchMoltbook();
@@ -2052,6 +2331,7 @@ setInterval(fetchMoltbook, 60000);
 setInterval(fetchCryptoPrices, 60000);
 setInterval(fetchCryptoNews, 120000);
 setInterval(renderFinanceWidgets, 30000);
+setInterval(fetchWalletBalances, 60000);
 </script>
 </body>
 </html>

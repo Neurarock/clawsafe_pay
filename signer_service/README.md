@@ -203,6 +203,15 @@ Returns `{"status": "ok", "wallet": "<configured_address>"}`.
 | **No private key exposure** | The private key is only loaded from env vars and used in-memory for signing. Never logged or returned via API. |
 | **Rate limiting** | Per-IP rate limiter (20 req/min). |
 
+### Wallet Key Sources
+
+The signer service loads private keys from two sources:
+
+1. **Environment variables** (current) — `WALLET_ADDR_N` / `WALLET_PRIV_KEY_N` pairs loaded at startup via `config.py`.
+2. **Publisher service DB** (planned sync) — The publisher service now stores wallets with encrypted private keys in SQLite via `POST /wallets`. For wallets added through the dashboard, the publisher currently manages the keys. A future enhancement could expose a `GET /wallets/{address}/key` internal endpoint for the signer to fetch keys on-demand, or use a shared secrets manager.
+
+**Current recommendation:** For env-configured wallets, the signer already has the private keys. For DB-managed wallets added via the dashboard, you should also add the corresponding `WALLET_ADDR_N` / `WALLET_PRIV_KEY_N` env vars to the signer service, or implement the sync mechanism described above.
+
 ---
 
 ## Testing

@@ -23,6 +23,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import publisher_service.config as config
 import publisher_service.database as db
 import publisher_service.api_users_db as api_users_db
+import publisher_service.wallets_db as wallets_db
 from publisher_service.injection_filter import check_injection
 from publisher_service.models import IntentResponse, IntentStatusResponse, PaymentIntent
 from publisher_service.orchestrator import run_intent_workflow
@@ -39,6 +40,11 @@ from publisher_service.api_user_models import (
     ApiKeyRegeneratedResponse,
     ApiUserUsageResponse,
 )
+from publisher_service.wallet_models import (
+    AddWallet,
+    WalletResponse,
+    WalletBalanceResponse,
+)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -51,6 +57,7 @@ logger = logging.getLogger("publisher_service.app")
 async def lifespan(app: FastAPI):
     db.init_db()
     api_users_db.init_api_users_db()
+    wallets_db.init_wallets_db()
     logger.info("Publisher service DB initialised at %s", db.DATABASE_PATH)
     yield
 
@@ -236,8 +243,122 @@ async def demo_dashboard():
 
 @app.get("/wallets")
 async def list_wallets():
-    """Return all configured wallet addresses."""
-    return {"wallets": config.AVAILABLE_WALLETS, "default": config.SIGNER_FROM_ADDRESS}
+    """Return all wallet addresses (DB + env-configured)."""
+    db_wallets = wallets_db.get_all_addresses()
+    db_default = wallets_db.get_default_address()
+    # Merge: DB wallets take priority, then env-configured ones
+    all_addrs = list(db_wallets)
+    for addr in config.AVAILABLE_WALLETS:
+        if addr.lower() not in [a.lower() for a in all_addrs]:
+            all_addrs.append(addr)
+    default = db_default or config.SIGNER_FROM_ADDRESS
+    return {"wallets": all_addrs, "default": default}
+
+
+# ── Wallet Management (admin-only) ──────────────────────────────────────────
+
+
+@app.post("/wallets", response_model=WalletResponse, status_code=201,
+          dependencies=[Depends(require_admin_key)])
+async def add_wallet_endpoint(body: AddWallet):
+    """Add a new wallet with address and private key. Admin only."""
+    try:
+        wallet = wallets_db.add_wallet(
+            address=body.address,
+            private_key=body.private_key,
+            label=body.label,
+            chain=body.chain,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    logger.info("Added wallet %s (%s)", wallet["id"], wallet["address"][:10])
+    return wallet
+
+
+@app.get("/wallets/managed", response_model=list[WalletResponse],
+         dependencies=[Depends(require_admin_key)])
+async def list_managed_wallets():
+    """List all DB-managed wallets (without private keys)."""
+    return wallets_db.list_wallets()
+
+
+@app.delete("/wallets/{wallet_id}", dependencies=[Depends(require_admin_key)])
+async def delete_wallet_endpoint(wallet_id: str):
+    """Delete a wallet by ID."""
+    ok = wallets_db.delete_wallet(wallet_id)
+    if not ok:
+        raise HTTPException(status_code=404, detail="Wallet not found")
+    logger.info("Deleted wallet %s", wallet_id)
+    return {"detail": "Wallet deleted"}
+
+
+@app.post("/wallets/{wallet_id}/set-default", response_model=WalletResponse,
+          dependencies=[Depends(require_admin_key)])
+async def set_default_wallet_endpoint(wallet_id: str):
+    """Set a wallet as the default sending wallet."""
+    ok = wallets_db.set_default_wallet(wallet_id)
+    if not ok:
+        raise HTTPException(status_code=404, detail="Wallet not found")
+    wallet = wallets_db.get_wallet(wallet_id)
+    return wallet
+
+
+@app.get("/wallets/balances")
+async def wallet_balances():
+    """Fetch on-chain balances for all managed wallets via Sepolia RPC."""
+    import httpx
+
+    db_wallets = wallets_db.list_wallets()
+    # Also include env-configured wallets not in DB
+    env_only = []
+    db_addrs_lower = {w["address"].lower() for w in db_wallets}
+    for addr in config.AVAILABLE_WALLETS:
+        if addr.lower() not in db_addrs_lower:
+            env_only.append({"address": addr, "label": "env", "chain": "sepolia"})
+
+    all_wallets = db_wallets + env_only
+    results = []
+
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        for w in all_wallets:
+            address = w["address"]
+            chain = w.get("chain", "sepolia")
+            try:
+                rpc_url = config.SEPOLIA_RPC_URL  # For now, all chains use this RPC
+                resp = await client.post(
+                    rpc_url,
+                    json={
+                        "jsonrpc": "2.0",
+                        "method": "eth_getBalance",
+                        "params": [address, "latest"],
+                        "id": 1,
+                    },
+                    headers={"Content-Type": "application/json"},
+                )
+                data = resp.json()
+                balance_hex = data.get("result", "0x0")
+                balance_wei = str(int(balance_hex, 16))
+                balance_eth = int(balance_hex, 16) / 1e18
+                results.append({
+                    "address": address,
+                    "label": w.get("label", ""),
+                    "chain": chain,
+                    "balance_wei": balance_wei,
+                    "balance_display": f"{balance_eth:.6f}",
+                    "symbol": "ETH",
+                })
+            except Exception as e:
+                logger.warning("Balance fetch failed for %s: %s", address[:10], e)
+                results.append({
+                    "address": address,
+                    "label": w.get("label", ""),
+                    "chain": chain,
+                    "balance_wei": "0",
+                    "balance_display": "error",
+                    "symbol": "ETH",
+                })
+
+    return results
 
 
 # ── API User Management (admin-only) ────────────────────────────────────────
@@ -416,6 +537,33 @@ async def dashboard_logo():
     if not logo_path.exists():
         raise HTTPException(status_code=404, detail="Logo not found")
     return FileResponse(logo_path, media_type="image/png")
+
+
+@app.get("/static/themes.css")
+async def themes_css():
+    """Serve the shared theme CSS."""
+    css_path = Path(__file__).resolve().parent.parent / "dashboard" / "src" / "themes.css"
+    if not css_path.exists():
+        raise HTTPException(status_code=404, detail="themes.css not found")
+    return FileResponse(css_path, media_type="text/css")
+
+
+@app.get("/static/pages.css")
+async def pages_css():
+    """Serve the shared page-layout CSS."""
+    css_path = Path(__file__).resolve().parent.parent / "dashboard" / "src" / "pages.css"
+    if not css_path.exists():
+        raise HTTPException(status_code=404, detail="pages.css not found")
+    return FileResponse(css_path, media_type="text/css")
+
+
+@app.get("/static/theme-loader.js")
+async def theme_loader_js():
+    """Serve the shared theme loader JS."""
+    js_path = Path(__file__).resolve().parent.parent / "dashboard" / "src" / "theme-loader.js"
+    if not js_path.exists():
+        raise HTTPException(status_code=404, detail="theme-loader.js not found")
+    return FileResponse(js_path, media_type="application/javascript")
 
 
 # ── Moltbook Feed Proxy ─────────────────────────────────────────────────────
