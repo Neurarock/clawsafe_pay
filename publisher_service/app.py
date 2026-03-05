@@ -388,6 +388,24 @@ async def homepage():
     return HTMLResponse(content=homepage_path.read_text(), status_code=200)
 
 
+@app.get("/setup-guide", response_class=HTMLResponse)
+async def setup_guide():
+    """Serve the Setup Guide page."""
+    page_path = Path(__file__).resolve().parent.parent / "dashboard" / "setup_guide.html"
+    if not page_path.exists():
+        raise HTTPException(status_code=404, detail="Setup Guide not found")
+    return HTMLResponse(content=page_path.read_text(), status_code=200)
+
+
+@app.get("/security", response_class=HTMLResponse)
+async def security_page():
+    """Serve the Security Architecture page."""
+    page_path = Path(__file__).resolve().parent.parent / "dashboard" / "security.html"
+    if not page_path.exists():
+        raise HTTPException(status_code=404, detail="Security page not found")
+    return HTMLResponse(content=page_path.read_text(), status_code=200)
+
+
 # ── Static assets ────────────────────────────────────────────────────────────
 
 

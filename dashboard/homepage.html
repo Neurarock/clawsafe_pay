@@ -169,6 +169,38 @@ footer a{color:var(--accent2)}
   .nav-links a:not(.nav-cta){display:none}
 }
 
+/* ── Quick Start Box ───────────────────────────────────────────────── */
+.quick-start-box{max-width:680px;margin:0 auto;border-radius:16px;background:var(--surface);border:1px solid var(--border);overflow:hidden;position:relative}
+.qs-tabs{display:flex;border-bottom:1px solid var(--border);background:rgba(0,0,0,.2)}
+.qs-tab{flex:1;padding:10px 16px;font-size:13px;font-weight:600;color:var(--muted);background:none;border:none;cursor:pointer;
+  font-family:inherit;transition:all .2s;border-bottom:2px solid transparent}
+.qs-tab.active{color:var(--accent2);border-bottom-color:var(--accent)}
+.qs-tab:hover{color:var(--text)}
+.qs-panel{display:none;position:relative;padding:20px 24px;text-align:left}
+.qs-panel.active{display:block}
+.qs-code{font-family:'JetBrains Mono','Fira Code',monospace;font-size:13px;line-height:1.8;color:var(--text);white-space:pre}
+.qs-prompt{color:var(--green);font-weight:700;user-select:none}
+.qs-comment{color:var(--muted);font-style:italic}
+.qs-copy{position:absolute;top:12px;right:12px;background:rgba(255,255,255,.06);border:1px solid var(--border);
+  border-radius:6px;padding:4px 10px;font-size:12px;color:var(--muted);cursor:pointer;transition:all .2s}
+.qs-copy:hover{background:var(--accent);color:#fff;border-color:var(--accent)}
+
+/* ── ClawHub Grid ─────────────────────────────────────────────────── */
+.clawhub-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:12px}
+.clawhub-card{padding:24px 20px;border-radius:14px;background:var(--surface);border:1px solid var(--border);
+  text-align:center;transition:all .35s cubic-bezier(.4,0,.2,1);position:relative;overflow:hidden}
+.clawhub-card::after{content:'';position:absolute;bottom:0;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,var(--cyan),var(--accent));opacity:0;transition:opacity .35s}
+.clawhub-card:hover{transform:translateY(-4px);border-color:rgba(6,182,212,.25);box-shadow:0 10px 30px rgba(6,182,212,.06)}
+.clawhub-card:hover::after{opacity:1}
+.clawhub-icon{font-size:28px;margin-bottom:12px}
+.clawhub-card h4{font-size:15px;font-weight:600;margin-bottom:6px}
+.clawhub-card p{font-size:12px;color:var(--muted);line-height:1.5;margin-bottom:10px}
+.clawhub-tag{display:inline-block;padding:3px 10px;border-radius:8px;font-size:10px;font-weight:600;
+  background:rgba(6,182,212,.1);border:1px solid rgba(6,182,212,.15);color:var(--cyan);text-transform:uppercase;letter-spacing:.5px}
+@media(max-width:900px){.clawhub-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:600px){.clawhub-grid{grid-template-columns:1fr}}
+
 /* ── Animate on Scroll ────────────────────────────────────────────────── */
 .reveal{opacity:0;transform:translateY(30px);transition:all .7s cubic-bezier(.4,0,.2,1)}
 .reveal.visible{opacity:1;transform:translateY(0)}
@@ -191,6 +223,9 @@ footer a{color:var(--accent2)}
     <a href="#features">Features</a>
     <a href="#how-it-works">How It Works</a>
     <a href="#architecture">Architecture</a>
+    <a href="/setup-guide">Setup Guide</a>
+    <a href="/security">Security</a>
+    <a href="https://clawhub.ai" target="_blank" rel="noopener">ClawHub ↗</a>
     <a href="/demo" class="nav-cta">Live Demo →</a>
   </div>
 </nav>
@@ -216,6 +251,50 @@ footer a{color:var(--accent2)}
       <span class="chain-pill btc">◆ Bitcoin</span>
       <span class="chain-pill zec">◆ Zcash</span>
       <span class="chain-pill ada">◆ Cardano</span>
+    </div>
+  </div>
+</section>
+
+<!-- Quick Start -->
+<section id="quick-start" style="background:linear-gradient(180deg,transparent,rgba(99,102,241,.03),transparent)">
+  <div class="container" style="text-align:center">
+    <div class="reveal">
+      <div class="section-label">⚡ Quick Start</div>
+      <div class="section-title">Up and Running in 60 Seconds</div>
+      <div class="section-subtitle" style="margin:0 auto 36px">
+        Clone, configure, launch. Three commands to a fully operational cold-storage payment pipeline.
+      </div>
+    </div>
+    <div class="quick-start-box reveal">
+      <div class="qs-tabs">
+        <button class="qs-tab active" onclick="switchQsTab(this,'qs-docker')">Docker</button>
+        <button class="qs-tab" onclick="switchQsTab(this,'qs-manual')">Manual</button>
+        <button class="qs-tab" onclick="switchQsTab(this,'qs-pip')">pip</button>
+      </div>
+      <div class="qs-panel active" id="qs-docker">
+        <div class="qs-code"><span class="qs-prompt">$</span> git clone https://github.com/anthropic/clawsafe-pay.git && cd clawsafe-pay
+<span class="qs-prompt">$</span> cp .env.example .env   <span class="qs-comment"># add your keys</span>
+<span class="qs-prompt">$</span> docker compose up</div>
+        <button class="qs-copy" onclick="copyQs(this)" title="Copy">📋</button>
+      </div>
+      <div class="qs-panel" id="qs-manual">
+        <div class="qs-code"><span class="qs-prompt">$</span> git clone https://github.com/anthropic/clawsafe-pay.git && cd clawsafe-pay
+<span class="qs-prompt">$</span> python -m venv .venv && source .venv/bin/activate
+<span class="qs-prompt">$</span> pip install -r publisher_service/requirements.txt
+<span class="qs-prompt">$</span> python -m publisher_service.main</div>
+        <button class="qs-copy" onclick="copyQs(this)" title="Copy">📋</button>
+      </div>
+      <div class="qs-panel" id="qs-pip">
+        <div class="qs-code"><span class="qs-prompt">$</span> pip install clawsafe-pay   <span class="qs-comment"># coming soon</span>
+<span class="qs-prompt">$</span> clawsafe init
+<span class="qs-prompt">$</span> clawsafe serve</div>
+        <button class="qs-copy" onclick="copyQs(this)" title="Copy">📋</button>
+      </div>
+    </div>
+    <div class="qs-links reveal" style="margin-top:24px;display:flex;gap:14px;justify-content:center;flex-wrap:wrap">
+      <a href="/setup-guide" class="btn-hero btn-hero-secondary" style="padding:10px 24px;font-size:13px">📖 Full Setup Guide</a>
+      <a href="/security" class="btn-hero btn-hero-secondary" style="padding:10px 24px;font-size:13px">🛡️ Security Design</a>
+      <a href="https://clawhub.ai" target="_blank" class="btn-hero btn-hero-secondary" style="padding:10px 24px;font-size:13px">🧩 Browse Skills on ClawHub ↗</a>
     </div>
   </div>
 </section>
@@ -365,6 +444,49 @@ footer a{color:var(--accent2)}
   </div>
 </section>
 
+<!-- ClawHub Skills -->
+<section id="clawhub" style="background:linear-gradient(180deg,transparent,rgba(6,182,212,.02),transparent)">
+  <div class="container" style="text-align:center">
+    <div class="reveal">
+      <div class="section-label">🧩 Ecosystem</div>
+      <div class="section-title">Extend with ClawHub Skills</div>
+      <div class="section-subtitle" style="margin:0 auto 36px">
+        ClawHub is the open marketplace for AI agent skills. Install payment skills, chain integrations,
+        and policy plugins with a single command.
+      </div>
+    </div>
+    <div class="clawhub-grid reveal">
+      <div class="clawhub-card">
+        <div class="clawhub-icon">⛓️</div>
+        <h4>Chain Skills</h4>
+        <p>EVM, Solana, Bitcoin, Zcash, Cardano — drop-in chain modules that plug into the registry.</p>
+        <span class="clawhub-tag">6 available</span>
+      </div>
+      <div class="clawhub-card">
+        <div class="clawhub-icon">💱</div>
+        <h4>Token Skills</h4>
+        <p>USDC, USDT, and custom ERC-20 token transfer builders with gas estimation.</p>
+        <span class="clawhub-tag">3 available</span>
+      </div>
+      <div class="clawhub-card">
+        <div class="clawhub-icon">🛡️</div>
+        <h4>Policy Plugins</h4>
+        <p>Spend limits, allowlists, velocity checks, and prompt injection filters.</p>
+        <span class="clawhub-tag">4 available</span>
+      </div>
+      <div class="clawhub-card">
+        <div class="clawhub-icon">🤖</div>
+        <h4>Agent Adapters</h4>
+        <p>OpenClaw, LangChain, CrewAI, AutoGPT — pre-built connectors for popular frameworks.</p>
+        <span class="clawhub-tag">Coming soon</span>
+      </div>
+    </div>
+    <div style="margin-top:32px" class="reveal">
+      <a href="https://clawhub.ai" target="_blank" class="btn-hero btn-hero-primary" style="padding:12px 28px;font-size:14px">Browse ClawHub ↗</a>
+    </div>
+  </div>
+</section>
+
 <!-- CTA -->
 <section class="cta-section">
   <div class="container">
@@ -398,6 +520,18 @@ const observer = new IntersectionObserver((entries) => {
 }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
 
 document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+
+// ── Quick Start Tabs ─────────────────────────────────────────────────
+function switchQsTab(btn, panelId) {
+  btn.closest('.quick-start-box').querySelectorAll('.qs-tab').forEach(t => t.classList.remove('active'));
+  btn.closest('.quick-start-box').querySelectorAll('.qs-panel').forEach(p => p.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById(panelId).classList.add('active');
+}
+function copyQs(btn) {
+  const code = btn.previousElementSibling.textContent.replace(/\$ /g, '');
+  navigator.clipboard.writeText(code).then(() => { btn.textContent = '✓'; setTimeout(() => btn.textContent = '📋', 1500); });
+}
 
 // ── Smooth Scroll ────────────────────────────────────────────────────
 document.querySelectorAll('a[href^="#"]').forEach(a => {

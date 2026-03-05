@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Setup Guide — ClawSafe Pay</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#030711;--surface:rgba(12,18,35,.75);--border:rgba(56,76,120,.25);
+  --text:#e8ecf4;--muted:#6b7a99;--accent:#6366f1;--accent2:#818cf8;
+  --green:#10b981;--cyan:#06b6d4;--purple:#a855f7;--amber:#f59e0b;
+  --red:#ef4444;
+}
+body{font-family:'Inter','SF Pro Display',-apple-system,BlinkMacSystemFont,system-ui,sans-serif;background:var(--bg);color:var(--text);overflow-x:hidden;line-height:1.7}
+::selection{background:var(--accent);color:#fff}
+a{color:var(--cyan);text-decoration:none;transition:color .2s}
+a:hover{color:#22d3ee}
+
+/* ── Background ──────────────────────────────────────────────────── */
+.bg-grid{position:fixed;inset:0;z-index:0;opacity:.03;
+  background-image:linear-gradient(rgba(99,102,241,.4) 1px,transparent 1px),linear-gradient(90deg,rgba(99,102,241,.4) 1px,transparent 1px);
+  background-size:60px 60px}
+.bg-orb{position:fixed;border-radius:50%;filter:blur(120px);opacity:.06;z-index:0}
+.bg-orb.o1{width:600px;height:600px;background:var(--accent);top:-200px;right:-100px}
+.bg-orb.o2{width:400px;height:400px;background:var(--cyan);bottom:-100px;left:-50px}
+
+/* ── Navigation ──────────────────────────────────────────────────── */
+nav{position:fixed;top:0;left:0;right:0;z-index:100;padding:16px 40px;
+  display:flex;align-items:center;justify-content:space-between;
+  background:rgba(3,7,17,.85);backdrop-filter:blur(16px);border-bottom:1px solid rgba(99,102,241,.08)}
+.nav-logo{display:flex;align-items:center;gap:12px}
+.logo-icon{width:36px;height:36px;border-radius:10px;overflow:hidden;flex-shrink:0}
+.logo-icon img{width:100%;height:100%;object-fit:cover;border-radius:inherit}
+.nav-logo span{font-size:18px;font-weight:700;background:linear-gradient(135deg,#fff,var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.nav-links{display:flex;align-items:center;gap:24px}
+.nav-links a{color:var(--muted);font-size:14px;font-weight:500;transition:color .2s}
+.nav-links a:hover{color:var(--text)}
+.nav-links a.active{color:var(--accent2)}
+.nav-cta{padding:8px 20px;border-radius:8px;background:linear-gradient(135deg,var(--accent),#4f46e5);
+  color:#fff;font-size:13px;font-weight:600;transition:all .25s}
+.nav-cta:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(99,102,241,.35);color:#fff}
+
+/* ── Content ─────────────────────────────────────────────────────── */
+.page{position:relative;z-index:1;max-width:860px;margin:0 auto;padding:120px 24px 80px}
+.page h1{font-size:clamp(28px,4vw,42px);font-weight:800;margin-bottom:8px;
+  background:linear-gradient(135deg,#fff 30%,var(--accent2) 60%,var(--cyan));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.page .subtitle{font-size:16px;color:var(--muted);margin-bottom:48px;max-width:600px}
+.page h2{font-size:22px;font-weight:700;margin:48px 0 16px;display:flex;align-items:center;gap:10px;color:var(--text)}
+.page h2 .step-badge{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;
+  border-radius:50%;background:var(--accent);color:#fff;font-size:14px;font-weight:700;flex-shrink:0}
+.page h3{font-size:16px;font-weight:600;margin:24px 0 8px;color:var(--accent2)}
+.page p{font-size:14px;color:var(--muted);margin-bottom:12px;line-height:1.7}
+.page ul,.page ol{margin:0 0 16px 20px;color:var(--muted);font-size:14px}
+.page li{margin-bottom:6px;line-height:1.6}
+
+/* ── Code Blocks ─────────────────────────────────────────────────── */
+.code-block{position:relative;margin:16px 0 24px;border-radius:12px;background:rgba(0,0,0,.4);
+  border:1px solid var(--border);overflow:hidden}
+.code-header{display:flex;align-items:center;justify-content:space-between;padding:8px 16px;
+  background:rgba(0,0,0,.3);border-bottom:1px solid var(--border);font-size:11px;color:var(--muted);
+  font-weight:600;text-transform:uppercase;letter-spacing:1px}
+.code-copy{background:none;border:1px solid var(--border);border-radius:6px;padding:3px 10px;
+  font-size:11px;color:var(--muted);cursor:pointer;transition:all .2s;font-family:inherit}
+.code-copy:hover{background:var(--accent);color:#fff;border-color:var(--accent)}
+pre{padding:16px 20px;overflow-x:auto;font-family:'JetBrains Mono','Fira Code',monospace;font-size:13px;line-height:1.7;color:var(--text)}
+pre .prompt{color:var(--green);font-weight:700;user-select:none}
+pre .comment{color:var(--muted);font-style:italic}
+pre .hl{color:var(--cyan)}
+pre .str{color:var(--green)}
+pre .kw{color:var(--purple)}
+
+/* ── Info Boxes ──────────────────────────────────────────────────── */
+.info-box{padding:16px 20px;border-radius:10px;margin:16px 0 20px;font-size:13px;line-height:1.6;
+  display:flex;gap:12px;align-items:flex-start}
+.info-box.tip{background:rgba(16,185,129,.06);border:1px solid rgba(16,185,129,.15);color:var(--green)}
+.info-box.warn{background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.15);color:var(--amber)}
+.info-box.danger{background:rgba(239,68,68,.06);border:1px solid rgba(239,68,68,.15);color:var(--red)}
+.info-box .icon{font-size:18px;flex-shrink:0;margin-top:1px}
+
+/* ── Table of Contents ───────────────────────────────────────────── */
+.toc{padding:20px 24px;border-radius:12px;background:var(--surface);border:1px solid var(--border);margin-bottom:40px}
+.toc h4{font-size:13px;font-weight:700;color:var(--text);margin-bottom:10px;text-transform:uppercase;letter-spacing:1px}
+.toc ol{margin:0 0 0 18px;padding:0}
+.toc li{margin-bottom:4px}
+.toc a{font-size:13px;color:var(--accent2)}
+.toc a:hover{color:var(--cyan)}
+
+/* ── Footer ──────────────────────────────────────────────────────── */
+footer{border-top:1px solid var(--border);padding:32px 0;text-align:center}
+footer p{font-size:12px;color:var(--muted)}
+
+/* ── Responsive ──────────────────────────────────────────────────── */
+@media(max-width:600px){
+  nav{padding:12px 16px}
+  .nav-links a:not(.nav-cta){display:none}
+  .page{padding:100px 16px 60px}
+}
+</style>
+</head>
+<body>
+
+<div class="bg-grid"></div>
+<div class="bg-orb o1"></div>
+<div class="bg-orb o2"></div>
+
+<!-- Navigation -->
+<nav>
+  <a href="/" class="nav-logo">
+    <div class="logo-icon"><img src="/dashboard/logo.png" alt="ClawSafe Pay"></div>
+    <span>ClawSafe Pay</span>
+  </a>
+  <div class="nav-links">
+    <a href="/#features">Features</a>
+    <a href="/setup-guide" class="active">Setup Guide</a>
+    <a href="/security">Security</a>
+    <a href="https://clawhub.ai" target="_blank" rel="noopener">ClawHub ↗</a>
+    <a href="/demo" class="nav-cta">Live Demo →</a>
+  </div>
+</nav>
+
+<div class="page">
+  <h1>Setup Guide</h1>
+  <p class="subtitle">Get ClawSafe Pay running from zero to a fully operational cold-storage payment pipeline.</p>
+
+  <!-- Table of Contents -->
+  <div class="toc">
+    <h4>Contents</h4>
+    <ol>
+      <li><a href="#prerequisites">Prerequisites</a></li>
+      <li><a href="#clone">Clone &amp; Install</a></li>
+      <li><a href="#env">Environment Configuration</a></li>
+      <li><a href="#services">Launch Services</a></li>
+      <li><a href="#telegram">Telegram Bot Setup</a></li>
+      <li><a href="#first-tx">Your First Transaction</a></li>
+      <li><a href="#chains">Adding Chains</a></li>
+      <li><a href="#production">Production Deployment</a></li>
+    </ol>
+  </div>
+
+  <!-- Step 1 -->
+  <h2 id="prerequisites"><span class="step-badge">1</span> Prerequisites</h2>
+  <p>Ensure you have the following installed on your machine:</p>
+  <ul>
+    <li><strong>Python 3.11+</strong> — <code>python3 --version</code></li>
+    <li><strong>pip</strong> &amp; <strong>venv</strong> — usually bundled with Python</li>
+    <li><strong>Git</strong> — for cloning the repository</li>
+    <li><strong>A Telegram account</strong> — for 2FA approval of transactions</li>
+    <li><strong>RPC endpoints</strong> — Infura, Alchemy, or a local node for your target chains</li>
+  </ul>
+
+  <div class="info-box tip">
+    <span class="icon">💡</span>
+    <div>For quick testing, use the <strong>Sepolia testnet</strong>. You can get free test ETH from <a href="https://sepoliafaucet.com" target="_blank">sepoliafaucet.com</a>.</div>
+  </div>
+
+  <!-- Step 2 -->
+  <h2 id="clone"><span class="step-badge">2</span> Clone &amp; Install</h2>
+  <div class="code-block">
+    <div class="code-header"><span>Terminal</span><button class="code-copy" onclick="copyBlock(this)">Copy</button></div>
+    <pre><span class="prompt">$</span> git clone https://github.com/anthropic/clawsafe-pay.git
+<span class="prompt">$</span> cd clawsafe-pay
+<span class="prompt">$</span> python3 -m venv .venv
+<span class="prompt">$</span> source .venv/bin/activate</pre>
+  </div>
+
+  <p>Install dependencies for each service:</p>
+  <div class="code-block">
+    <div class="code-header"><span>Terminal</span><button class="code-copy" onclick="copyBlock(this)">Copy</button></div>
+    <pre><span class="prompt">$</span> pip install -r publisher_service/requirements.txt
+<span class="prompt">$</span> pip install -r signer_service/requirements.txt
+<span class="prompt">$</span> pip install -r user_auth/requirements.txt
+<span class="prompt">$</span> pip install -r transaction_builder/requirements.txt</pre>
+  </div>
+
+  <!-- Step 3 -->
+  <h2 id="env"><span class="step-badge">3</span> Environment Configuration</h2>
+  <p>Create a <code>.env</code> file in the project root. Here's the template:</p>
+  <div class="code-block">
+    <div class="code-header"><span>.env</span><button class="code-copy" onclick="copyBlock(this)">Copy</button></div>
+    <pre><span class="comment"># ── Chains ─────────────────────────────────────────</span>
+<span class="hl">SEPOLIA_RPC_URL</span>=https://sepolia.infura.io/v3/YOUR_KEY
+<span class="hl">BASE_RPC_URL</span>=https://mainnet.base.org
+
+<span class="comment"># ── Signer Service ─────────────────────────────────</span>
+<span class="hl">SIGNER_PRIVATE_KEY</span>=0xYOUR_PRIVATE_KEY
+<span class="hl">SIGNER_HMAC_SECRET</span>=your-shared-hmac-secret
+<span class="hl">SIGNER_PORT</span>=8001
+
+<span class="comment"># ── Publisher Service ──────────────────────────────</span>
+<span class="hl">PUBLISHER_HMAC_SECRET</span>=your-shared-hmac-secret
+<span class="hl">PUBLISHER_PORT</span>=8002
+
+<span class="comment"># ── User Auth (Telegram) ──────────────────────────</span>
+<span class="hl">TELEGRAM_BOT_TOKEN</span>=123456:ABC-your-bot-token
+<span class="hl">TELEGRAM_CHAT_ID</span>=your-chat-id
+<span class="hl">USER_AUTH_PORT</span>=8000
+
+<span class="comment"># ── Optional ──────────────────────────────────────</span>
+<span class="hl">REVIEWER_ENABLED</span>=false
+<span class="hl">REVIEWER_MODEL</span>=claude-sonnet-4-20250514</pre>
+  </div>
+
+  <div class="info-box danger">
+    <span class="icon">🔐</span>
+    <div><strong>Never commit your <code>.env</code> file.</strong> It contains private keys and secrets. The <code>.gitignore</code> already excludes it.</div>
+  </div>
+
+  <!-- Step 4 -->
+  <h2 id="services"><span class="step-badge">4</span> Launch Services</h2>
+  <p>Start each service in a separate terminal (or use the demo script):</p>
+  <div class="code-block">
+    <div class="code-header"><span>Terminal 1 — User Auth</span><button class="code-copy" onclick="copyBlock(this)">Copy</button></div>
+    <pre><span class="prompt">$</span> python -m user_auth.main
+<span class="comment"># → User Auth running on :8000</span></pre>
+  </div>
+  <div class="code-block">
+    <div class="code-header"><span>Terminal 2 — Signer</span><button class="code-copy" onclick="copyBlock(this)">Copy</button></div>
+    <pre><span class="prompt">$</span> python -m signer_service.main
+<span class="comment"># → Signer Service running on :8001</span></pre>
+  </div>
+  <div class="code-block">
+    <div class="code-header"><span>Terminal 3 — Publisher</span><button class="code-copy" onclick="copyBlock(this)">Copy</button></div>
+    <pre><span class="prompt">$</span> python -m publisher_service.main
+<span class="comment"># → Publisher API running on :8002</span></pre>
+  </div>
+
+  <p>Or use the all-in-one demo launcher:</p>
+  <div class="code-block">
+    <div class="code-header"><span>Terminal</span><button class="code-copy" onclick="copyBlock(this)">Copy</button></div>
+    <pre><span class="prompt">$</span> bash demo.sh</pre>
+  </div>
+
+  <div class="info-box tip">
+    <span class="icon">✅</span>
+    <div>Once running, visit <a href="http://localhost:8002">http://localhost:8002</a> for the homepage and <a href="http://localhost:8002/demo">http://localhost:8002/demo</a> for the live dashboard.</div>
+  </div>
+
+  <!-- Step 5 -->
+  <h2 id="telegram"><span class="step-badge">5</span> Telegram Bot Setup</h2>
+  <p>The human-in-the-loop 2FA requires a Telegram bot:</p>
+  <ol>
+    <li>Open Telegram and message <a href="https://t.me/BotFather" target="_blank">@BotFather</a></li>
+    <li>Send <code>/newbot</code> and follow the prompts to create your bot</li>
+    <li>Copy the <strong>bot token</strong> into <code>TELEGRAM_BOT_TOKEN</code> in your <code>.env</code></li>
+    <li>Start a conversation with your bot and send any message</li>
+    <li>Get your chat ID: <code>curl https://api.telegram.org/bot&lt;TOKEN&gt;/getUpdates</code></li>
+    <li>Set <code>TELEGRAM_CHAT_ID</code> in your <code>.env</code></li>
+  </ol>
+
+  <div class="info-box warn">
+    <span class="icon">⚠️</span>
+    <div>Only add your own Telegram chat ID. The bot will send transaction approval requests to this chat. Anyone with access can approve or reject transactions.</div>
+  </div>
+
+  <!-- Step 6 -->
+  <h2 id="first-tx"><span class="step-badge">6</span> Your First Transaction</h2>
+  <p>Submit a test payment intent via the API:</p>
+  <div class="code-block">
+    <div class="code-header"><span>cURL</span><button class="code-copy" onclick="copyBlock(this)">Copy</button></div>
+    <pre><span class="prompt">$</span> curl -X POST http://localhost:8002/intents \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: your-api-key" \
+  -d '{
+    <span class="str">"chain"</span>: <span class="str">"sepolia"</span>,
+    <span class="str">"to"</span>: <span class="str">"0x742d35Cc6634C0532925a3b844Bc9e7595f..."</span>,
+    <span class="str">"amount"</span>: <span class="str">"0.001"</span>,
+    <span class="str">"asset"</span>: <span class="str">"ETH"</span>,
+    <span class="str">"agent_id"</span>: <span class="str">"test-agent"</span>
+  }'</pre>
+  </div>
+  <p>The flow: <strong>Publisher</strong> validates → builds draft transaction → sends to <strong>Signer</strong> → Signer requests Telegram approval → on Approve, signs &amp; broadcasts → returns tx hash.</p>
+
+  <!-- Step 7 -->
+  <h2 id="chains"><span class="step-badge">7</span> Adding Chains</h2>
+  <p>ClawSafe Pay supports multiple chains through its registry system. Each chain module lives in <code>chains/</code>:</p>
+  <div class="code-block">
+    <div class="code-header"><span>chains/</span></div>
+    <pre>chains/
+├── evm/
+│   ├── sepolia/    <span class="comment"># Ethereum Sepolia testnet</span>
+│   └── base_l2/    <span class="comment"># Base L2 mainnet</span>
+├── solana/         <span class="comment"># Solana mainnet/devnet</span>
+├── bitcoin/        <span class="comment"># Bitcoin mainnet/testnet</span>
+├── cardano/        <span class="comment"># Cardano mainnet</span>
+├── zcash/          <span class="comment"># Zcash mainnet</span>
+└── tokens/         <span class="comment"># USDC, USDT token support</span></pre>
+  </div>
+  <p>To add a new EVM chain, create a folder in <code>chains/evm/</code> with a <code>__init__.py</code> that registers the chain config, provider, builder, and signer. The chain is then available for use in payment intents.</p>
+
+  <div class="info-box tip">
+    <span class="icon">🧩</span>
+    <div>Browse pre-built chain modules on <a href="https://clawhub.ai" target="_blank">ClawHub</a> — install new chains with a single command.</div>
+  </div>
+
+  <!-- Step 8 -->
+  <h2 id="production"><span class="step-badge">8</span> Production Deployment</h2>
+  <p>For production, follow these additional steps:</p>
+  <ul>
+    <li><strong>Air-gap the signer:</strong> Run the signer service on a separate, firewalled machine that only accepts connections from the publisher</li>
+    <li><strong>Use a hardware wallet:</strong> For maximum security, integrate with a Ledger or Trezor instead of a software key</li>
+    <li><strong>Enable the reviewer:</strong> Set <code>REVIEWER_ENABLED=true</code> to add an LLM risk analysis step for every transaction</li>
+    <li><strong>Set spend limits:</strong> Configure per-agent daily and per-transaction limits in the policy engine</li>
+    <li><strong>Enable HTTPS:</strong> Put services behind a reverse proxy (nginx, Caddy) with TLS termination</li>
+    <li><strong>Rotate secrets:</strong> Regularly rotate HMAC secrets and API keys</li>
+  </ul>
+
+  <div class="info-box danger">
+    <span class="icon">🔐</span>
+    <div><strong>Never expose the signer service to the public internet.</strong> It should only be reachable from the publisher service on your internal network.</div>
+  </div>
+
+  <div style="text-align:center;margin-top:48px;padding:32px;border-radius:16px;background:var(--surface);border:1px solid var(--border)">
+    <p style="font-size:16px;font-weight:600;color:var(--text);margin-bottom:8px">Ready to try it?</p>
+    <p style="color:var(--muted);margin-bottom:16px;font-size:13px">The demo dashboard runs with simulated data — no real keys needed.</p>
+    <a href="/demo" style="display:inline-block;padding:10px 28px;border-radius:10px;background:linear-gradient(135deg,var(--accent),#4f46e5);color:#fff;font-weight:600;font-size:14px;transition:all .25s">Open Demo Dashboard →</a>
+  </div>
+</div>
+
+<!-- Footer -->
+<footer>
+  <div style="max-width:860px;margin:0 auto;padding:0 24px">
+    <p>ClawSafe Pay — Self-custody cold storage for AI agent payments. <a href="/">Home</a> · <a href="/security">Security</a> · <a href="/demo">Dashboard</a></p>
+  </div>
+</footer>
+
+<script>
+function copyBlock(btn) {
+  const pre = btn.closest('.code-block').querySelector('pre');
+  const text = pre.textContent.replace(/^\$ /gm, '');
+  navigator.clipboard.writeText(text).then(() => {
+    btn.textContent = '✓ Copied';
+    setTimeout(() => btn.textContent = 'Copy', 1500);
+  });
+}
+
+document.querySelectorAll('a[href^="#"]').forEach(a => {
+  a.addEventListener('click', e => {
+    e.preventDefault();
+    const t = document.querySelector(a.getAttribute('href'));
+    if (t) t.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+});
+</script>
+</body>
+</html>

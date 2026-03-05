@@ -112,8 +112,9 @@ header::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;back
 .logo{display:flex;align-items:center;gap:12px}
 .logo-icon{width:40px;height:40px;border-radius:10px;overflow:hidden;flex-shrink:0}
 .logo-icon img{width:100%;height:100%;object-fit:cover;border-radius:inherit}
-.logo h1{font-size:18px;font-weight:700;background:linear-gradient(135deg,#fff,var(--accent2),var(--cyan));-webkit-background-clip:text;-webkit-text-fill-color:var(--red)}
-.logo .sub{font-size:10px;color:var(--muted);letter-spacing:1.2px;text-transform:uppercase}
+.logo h1{font-size:20px;font-weight:800;letter-spacing:-.3px;background:linear-gradient(135deg,var(--text) 0%,var(--accent) 40%,var(--cyan) 70%,var(--accent2) 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-size:200% 200%;animation:titleGrad 6s ease-in-out infinite;text-shadow:none;line-height:1.2;filter:drop-shadow(0 0 8px rgba(99,102,241,.15))}
+@keyframes titleGrad{0%,100%{background-position:0% 50%}50%{background-position:100% 50%}}
+.logo .sub{font-size:10px;color:var(--muted);letter-spacing:1.5px;text-transform:uppercase;font-weight:500}
 .hdr-right{display:flex;align-items:center;gap:10px}
 .sys-badge{display:flex;align-items:center;gap:6px;padding:6px 12px;border-radius:8px;background:rgba(16,185,129,.06);border:1px solid rgba(16,185,129,.15);font-size:11px;color:var(--green);font-weight:500}
 .sys-dot{width:6px;height:6px;border-radius:50%;background:var(--green);animation:blink 2s ease-in-out infinite}
@@ -128,7 +129,7 @@ header::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;back
 .admin-banner strong{color:var(--text)}
 
 /* ── Stats Row ────────────────────────────────────────────────────── */
-.stats{display:grid;grid-template-columns:repeat(auto-fill,minmax(135px,1fr));gap:8px;margin-bottom:14px}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px}
 .stat-card{padding:10px 14px;border-radius:10px;background:var(--surface);border:1px solid var(--border);transition:all .3s;position:relative;overflow:hidden}
 .stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;opacity:0;transition:opacity .3s}
 .stat-card:nth-child(1)::before{background:linear-gradient(90deg,var(--accent),var(--purple))}
@@ -169,7 +170,7 @@ header::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;back
 .w-count{font-size:10px;font-weight:600;padding:2px 8px;border-radius:6px;background:rgba(99,102,241,.08);color:var(--accent2);border:1px solid rgba(99,102,241,.12)}
 
 /* ── Dashboard Grid ───────────────────────────────────────────────── */
-.dash-grid{display:grid;grid-template-columns:380px 1fr;gap:14px;margin-bottom:14px}
+.dash-grid{display:grid;grid-template-columns:380px 1fr 280px;gap:14px;margin-bottom:14px}
 .dash-col{display:flex;flex-direction:column;gap:14px}
 
 /* ── Form Elements ────────────────────────────────────────────────── */
@@ -390,7 +391,7 @@ tr:last-child td{border-bottom:none}
 .right-sub{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 
 /* ── Finance Widgets ──────────────────────────────────────────────── */
-.finance-row{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:14px}
+.finance-row{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;margin-bottom:14px}
 .budget-bar-wrap{margin-bottom:10px}
 .budget-bar-label{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
 .budget-bar-name{font-size:11px;font-weight:600}
@@ -428,7 +429,8 @@ tr:last-child td{border-bottom:none}
 .kpi-row{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
 
 /* ── Crypto Price Ticker ───────────────────────────────────────────── */
-.crypto-ticker{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px}
+.crypto-ticker{display:flex;flex-direction:column;gap:6px}
+.crypto-ticker-wide{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px}
 .crypto-card{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;background:var(--surface2);border:1px solid var(--border);transition:all .3s;cursor:default;position:relative;overflow:hidden}
 .crypto-card:hover{border-color:var(--border-hi);transform:translateY(-2px);box-shadow:0 6px 20px rgba(99,102,241,.1)}
 .crypto-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--accent),var(--cyan));opacity:0;transition:opacity .3s}
@@ -470,10 +472,11 @@ tr:last-child td{border-bottom:none}
 .github-btn svg{width:14px;height:14px;fill:currentColor}
 
 /* ── Responsive ───────────────────────────────────────────────────── */
-@media(max-width:1200px){.finance-row{grid-template-columns:1fr}.crypto-ticker{grid-template-columns:repeat(auto-fill,minmax(180px,1fr))}}
+@media(max-width:1400px){.dash-grid{grid-template-columns:380px 1fr}.dash-col-prices{display:none}}
+@media(max-width:1200px){.finance-row{grid-template-columns:1fr}}
 @media(max-width:1200px){.right-sub{grid-template-columns:1fr}}
 @media(max-width:1024px){.dash-grid{grid-template-columns:1fr}.stats{grid-template-columns:repeat(3,1fr)}}
-@media(max-width:768px){.stats{grid-template-columns:repeat(2,1fr)}header{flex-direction:column;gap:8px;text-align:center}.hdr-right{flex-wrap:wrap;justify-content:center}.crypto-ticker{grid-template-columns:1fr 1fr}}
+@media(max-width:768px){.stats{grid-template-columns:repeat(2,1fr)}header{flex-direction:column;gap:8px;text-align:center}.hdr-right{flex-wrap:wrap;justify-content:center}}
 </style>
 </head>
 <body>
@@ -535,22 +538,6 @@ tr:last-child td{border-bottom:none}
     <div class="stat-card"><div class="stat-label">Agents</div><div class="stat-value cyan" id="s-agents">0</div><div class="stat-sub" id="s-agents-sub">&nbsp;</div></div>
   </div>
 
-  <!-- ═══ Crypto Prices ═══ -->
-  <div class="widget" id="w-crypto-prices" style="margin-bottom:14px">
-    <div class="wh">
-      <div class="wt"><span class="wt-icon">₿</span> Crypto Prices — Top 10 <span class="live-pill">LIVE</span></div>
-      <div class="wa">
-        <button class="w-btn" onclick="fetchCryptoPrices()" title="Refresh">↻</button>
-        <button class="w-btn" onclick="toggleWidget(this)">−</button>
-      </div>
-    </div>
-    <div class="wb pad">
-      <div class="crypto-ticker" id="cryptoTicker">
-        <div class="empty-state"><div class="icon">₿</div><p>Loading crypto prices…</p></div>
-      </div>
-    </div>
-  </div>
-
   <!-- ═══ Finance Overview ═══ -->
   <div class="finance-row">
 
@@ -577,19 +564,6 @@ tr:last-child td{border-bottom:none}
       <div class="wb pad">
         <div id="forecastContent">
           <div class="empty-state"><div class="icon">📈</div><p>Calculating forecast…</p></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- 📊 Cost Breakdown -->
-    <div class="widget" id="w-costs">
-      <div class="wh">
-        <div class="wt"><span class="wt-icon">📊</span> Cost Breakdown</div>
-        <div class="wa"><button class="w-btn" onclick="toggleWidget(this)">−</button></div>
-      </div>
-      <div class="wb pad" style="max-height:320px">
-        <div id="costBreakdown">
-          <div class="empty-state"><div class="icon">📊</div><p>No spend data yet</p></div>
         </div>
       </div>
     </div>
@@ -936,6 +910,25 @@ tr:last-child td{border-bottom:none}
       </div><!-- /right-sub -->
 
     </div><!-- /dash-col right -->
+
+    <!-- ── Right Sidebar: Crypto Prices ── -->
+    <div class="dash-col dash-col-prices">
+      <div class="widget" id="w-crypto-prices">
+        <div class="wh">
+          <div class="wt"><span class="wt-icon">₿</span> Top 10 Crypto <span class="live-pill">LIVE</span></div>
+          <div class="wa">
+            <button class="w-btn" onclick="fetchCryptoPrices()" title="Refresh">↻</button>
+            <button class="w-btn" onclick="toggleWidget(this)">−</button>
+          </div>
+        </div>
+        <div class="wb pad" style="overflow-y:auto">
+          <div class="crypto-ticker" id="cryptoTicker">
+            <div class="empty-state"><div class="icon">₿</div><p>Loading prices…</p></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
   </div><!-- /dash-grid -->
 
 </div><!-- /app -->
