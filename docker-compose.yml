@@ -19,6 +19,8 @@ services:
       AUTH_SERVICE_HOST: "0.0.0.0"
       AUTH_SERVICE_PORT: "8000"
       SIGNER_SERVICE_CALLBACK_URL: "http://signer:8001/auth/callback"
+      SEED_DB_PATH: "/app/backend/user_auth/auth_requests.db"
+      SEED_SQL_PATH: "/app/seed/user_auth.sql"
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
       interval: 10s
@@ -38,6 +40,8 @@ services:
       SIGNER_SERVICE_HOST: "0.0.0.0"
       SIGNER_SERVICE_PORT: "8001"
       USER_AUTH_URL: "http://user_auth:8000"
+      SEED_DB_PATH: "/app/backend/signer_service/signer.db"
+      SEED_SQL_PATH: "/app/seed/signer.sql"
     depends_on:
       user_auth:
         condition: service_healthy
@@ -59,6 +63,8 @@ services:
     environment:
       PUBLISHER_SERVICE_PORT: "8002"
       SIGNER_SERVICE_URL: "http://signer:8001"
+      SEED_DB_PATH: "/app/backend/publisher_service/intents.db"
+      SEED_SQL_PATH: "/app/seed/publisher.sql"
     depends_on:
       signer:
         condition: service_healthy
@@ -80,6 +86,7 @@ services:
     environment:
       DASHBOARD_PORT: "8008"
       PUBLISHER_API_URL: "http://publisher:8002"
+      PUBLISHER_BROWSER_URL: "http://localhost:${PUBLISHER_SERVICE_PORT:-8002}"
     depends_on:
       publisher:
         condition: service_healthy

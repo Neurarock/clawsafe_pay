@@ -55,7 +55,7 @@ async def health():
 async def frontend_config():
     """Inject publisher API URL and key so the frontend knows where the backend lives."""
     js = (
-        f'window.__CLAWSAFE_API = "{config.PUBLISHER_API_URL}";\n'
+        f'window.__CLAWSAFE_API = "{config.PUBLISHER_BROWSER_URL}";\n'
         f'window.__CLAWSAFE_API_KEY = "{config.PUBLISHER_API_KEY}";\n'
     )
     return Response(content=js, media_type="application/javascript")
