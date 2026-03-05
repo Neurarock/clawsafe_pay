@@ -27,6 +27,7 @@ CREATE TABLE IF NOT EXISTS payment_intents (
     asset               TEXT NOT NULL DEFAULT 'ETH',
     note                TEXT NOT NULL DEFAULT '',
     status              TEXT NOT NULL DEFAULT 'pending',
+    api_user_id         TEXT NOT NULL DEFAULT '',
     created_at          TEXT NOT NULL,
     updated_at          TEXT NOT NULL,
     draft_tx_json       TEXT,
@@ -35,6 +36,11 @@ CREATE TABLE IF NOT EXISTS payment_intents (
     tx_hash             TEXT,
     error_message       TEXT
 );
+"""
+
+# Migration: add api_user_id column if it doesn't exist (for existing DBs)
+_MIGRATE_API_USER_ID = """
+ALTER TABLE payment_intents ADD COLUMN api_user_id TEXT NOT NULL DEFAULT '';
 """
 
 VALID_STATUSES = {
@@ -60,6 +66,11 @@ def _get_connection():
 def init_db() -> None:
     with _get_connection() as conn:
         conn.executescript(CREATE_TABLE_SQL)
+        # Migrate: add api_user_id if missing (idempotent)
+        try:
+            conn.execute(_MIGRATE_API_USER_ID)
+        except sqlite3.OperationalError:
+            pass  # column already exists
 
 
 def insert_intent(
@@ -72,16 +83,17 @@ def insert_intent(
     chain: str = "sepolia",
     asset: str = "ETH",
     from_address: str = "",
+    api_user_id: str = "",
 ) -> dict:
     now = datetime.now(timezone.utc).isoformat()
     with _get_connection() as conn:
         conn.execute(
             """
             INSERT INTO payment_intents
-              (intent_id, from_user, to_user, to_address, from_address, amount_wei, chain, asset, note, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+              (intent_id, from_user, to_user, to_address, from_address, amount_wei, chain, asset, note, api_user_id, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
-            (intent_id, from_user, to_user, to_address, from_address, amount_wei, chain, asset, note, now, now),
+            (intent_id, from_user, to_user, to_address, from_address, amount_wei, chain, asset, note, api_user_id, now, now),
         )
     return get_intent(intent_id)
 
@@ -160,5 +172,15 @@ def list_intents() -> list[dict]:
     with _get_connection() as conn:
         rows = conn.execute(
             "SELECT * FROM payment_intents ORDER BY created_at DESC"
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def list_intents_by_agent(api_user_id: str) -> list[dict]:
+    """Return intents submitted by a specific API user."""
+    with _get_connection() as conn:
+        rows = conn.execute(
+            "SELECT * FROM payment_intents WHERE api_user_id = ? ORDER BY created_at DESC",
+            (api_user_id,),
         ).fetchall()
     return [dict(r) for r in rows]

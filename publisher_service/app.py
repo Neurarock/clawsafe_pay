@@ -12,6 +12,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import re
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -148,6 +149,7 @@ async def submit_intent(request: Request, payload: PaymentIntent, _key=Depends(r
         chain=payload.chain,
         asset=payload.asset,
         from_address=payload.from_address,
+        api_user_id=api_user["id"] if api_user else "",
     )
     logger.info("Intent %s received (from=%s to=%s chain=%s from_address=%s)", payload.intent_id, payload.from_user, payload.to_user, payload.chain, payload.from_address or 'default')
 
@@ -215,6 +217,7 @@ async def list_intents():
             "note": row["note"],
             "tx_hash": row["tx_hash"],
             "error_message": row["error_message"],
+            "api_user_id": row.get("api_user_id", ""),
             "created_at": row["created_at"],
             "updated_at": row["updated_at"],
         })
@@ -336,6 +339,34 @@ async def get_api_user_usage_endpoint(user_id: str):
     }
 
 
+@app.get("/api-users/{user_id}/intents", dependencies=[Depends(require_admin_key)])
+async def list_agent_intents(user_id: str):
+    """List all intents submitted by a specific API user (agent)."""
+    user = api_users_db.get_api_user(user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="API user not found")
+    rows = db.list_intents_by_agent(user_id)
+    results = []
+    for row in rows:
+        results.append({
+            "intent_id": row["intent_id"],
+            "status": row["status"],
+            "from_user": row["from_user"],
+            "to_user": row["to_user"],
+            "to_address": row["to_address"],
+            "from_address": row.get("from_address", ""),
+            "amount_wei": row["amount_wei"],
+            "chain": row.get("chain", "sepolia"),
+            "asset": row.get("asset", "ETH"),
+            "note": row["note"],
+            "tx_hash": row["tx_hash"],
+            "error_message": row["error_message"],
+            "created_at": row["created_at"],
+            "updated_at": row["updated_at"],
+        })
+    return results
+
+
 # ── Dashboard pages ──────────────────────────────────────────────────────────
 
 
@@ -355,3 +386,111 @@ async def homepage():
     if not homepage_path.exists():
         raise HTTPException(status_code=404, detail="Homepage not found")
     return HTMLResponse(content=homepage_path.read_text(), status_code=200)
+
+
+# ── Static assets ────────────────────────────────────────────────────────────
+
+
+@app.get("/dashboard/logo.png")
+async def dashboard_logo():
+    """Serve the dashboard logo image."""
+    logo_path = Path(__file__).resolve().parent.parent / "dashboard" / "src" / "logo.png"
+    if not logo_path.exists():
+        raise HTTPException(status_code=404, detail="Logo not found")
+    return FileResponse(logo_path, media_type="image/png")
+
+
+# ── Moltbook Feed Proxy ─────────────────────────────────────────────────────
+
+MOLTBOOK_URL = "https://www.moltbook.com"
+MOLTBOOK_API = f"{MOLTBOOK_URL}/api/v1/posts"
+FINANCE_KEYWORDS = re.compile(
+    r"money|crypto|finance|bitcoin|btc|ethereum|eth|solana|sol|defi|"
+    r"trading|market|token|wallet|stablecoin|nft|yield|liquidity|"
+    r"payment|banking|usdc|usdt|swap|invest|fund|stock|price|"
+    r"blockchain|ledger|mining|staking|airdrop|dao|dex|cex|"
+    r"economic|monetary|capital|currency|exchange|portfolio",
+    re.IGNORECASE,
+)
+
+
+def _format_age(iso_ts: str) -> str:
+    """Convert ISO timestamp to a human-friendly '2h ago' string."""
+    from datetime import datetime, timezone
+
+    try:
+        created = datetime.fromisoformat(iso_ts.replace("Z", "+00:00"))
+        delta = datetime.now(timezone.utc) - created
+        secs = int(delta.total_seconds())
+        if secs < 60:
+            return "just now"
+        if secs < 3600:
+            m = secs // 60
+            return f"{m}m ago"
+        if secs < 86400:
+            h = secs // 3600
+            return f"{h}h ago"
+        d = secs // 86400
+        return f"{d}d ago"
+    except Exception:
+        return ""
+
+
+def _process_moltbook_posts(api_data: dict) -> list[dict]:
+    """Transform Moltbook API response into dashboard-friendly dicts,
+    filtered for finance/crypto/money relevance."""
+    raw_posts = api_data.get("posts", [])
+    results: list[dict] = []
+
+    for p in raw_posts:
+        title = p.get("title", "")
+        content = p.get("content", "")
+        author_obj = p.get("author") or {}
+        submolt_obj = p.get("submolt") or {}
+        submolt_name = submolt_obj.get("name", "")
+
+        post = {
+            "title": title,
+            "url": f"{MOLTBOOK_URL}/post/{p.get('id', '')}",
+            "author": author_obj.get("name", "unknown"),
+            "karma": p.get("score") or (p.get("upvotes", 0) - p.get("downvotes", 0)),
+            "comments": p.get("comment_count"),
+            "submolt": f"m/{submolt_name}" if submolt_name else None,
+            "age": _format_age(p.get("created_at", "")),
+            "snippet": content[:160].strip() if content else "",
+        }
+        results.append(post)
+
+    # Filter for finance/crypto/money topics
+    filtered = [
+        r for r in results
+        if FINANCE_KEYWORDS.search(r["title"])
+        or FINANCE_KEYWORDS.search(r.get("snippet", ""))
+        or (r["submolt"] and FINANCE_KEYWORDS.search(r["submolt"]))
+    ]
+
+    # If very few finance-specific posts, return all (agents discussing
+    # general topics is still relevant context for the dashboard).
+    if len(filtered) < 3:
+        return results[:20]
+
+    return filtered[:20]
+
+
+@app.get("/moltbook-feed")
+async def moltbook_feed():
+    """Proxy Moltbook posts filtered for money/crypto/finance topics."""
+    import httpx
+
+    try:
+        async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as client:
+            resp = await client.get(MOLTBOOK_API, headers={
+                "User-Agent": "ClawSafePay/1.0 Dashboard Feed",
+                "Accept": "application/json",
+            })
+            resp.raise_for_status()
+            posts = _process_moltbook_posts(resp.json())
+            return JSONResponse(content=posts)
+    except Exception as e:
+        logger.error("Moltbook feed fetch failed: %s", e)
+        return JSONResponse(content=[], status_code=200)
