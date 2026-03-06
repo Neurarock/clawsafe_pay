@@ -11,7 +11,7 @@ import logging
 import re
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, FileResponse, JSONResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -59,6 +59,47 @@ async def frontend_config():
         f'window.__CLAWSAFE_API_KEY = "{config.PUBLISHER_API_KEY}";\n'
     )
     return Response(content=js, media_type="application/javascript")
+
+
+# ── Publisher API proxy (same-origin for browser) ───────────────────────────
+
+
+@app.api_route(
+    "/publisher/{path:path}",
+    methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+)
+async def publisher_proxy(path: str, request: Request):
+    """Proxy browser calls to publisher_service over the Docker network."""
+    import httpx
+
+    upstream = f"{config.PUBLISHER_API_URL.rstrip('/')}/{path.lstrip('/')}"
+    if request.url.query:
+        upstream = f"{upstream}?{request.url.query}"
+
+    headers = {"X-API-Key": config.PUBLISHER_API_KEY}
+    content_type = request.headers.get("content-type")
+    if content_type:
+        headers["Content-Type"] = content_type
+
+    body = await request.body()
+
+    try:
+        async with httpx.AsyncClient(timeout=20.0, follow_redirects=True) as client:
+            resp = await client.request(
+                request.method,
+                upstream,
+                headers=headers,
+                content=body if body else None,
+            )
+    except Exception as e:
+        logger.error("Publisher proxy request failed: %s %s (%s)", request.method, upstream, e)
+        return JSONResponse(
+            status_code=502,
+            content={"detail": "publisher proxy unreachable"},
+        )
+
+    media_type = resp.headers.get("content-type", "application/json")
+    return Response(content=resp.content, status_code=resp.status_code, media_type=media_type)
 
 
 # ── Page routes ──────────────────────────────────────────────────────────────
