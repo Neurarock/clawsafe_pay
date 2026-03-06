@@ -215,6 +215,9 @@ export function renderTimeline() {
 
 // ── Form Submission ──────────────────────────────────────────────────
 export function setupTxForm() {
+  // Start on Simple Payment tab
+  switchTxTab('simple');
+
   // Pre-fill the API key field with the default agent key if available
   const txApiKeyInput = document.getElementById('tx-api-key');
   if (txApiKeyInput && DEFAULT_AGENT_KEY) {
@@ -302,9 +305,243 @@ export function startFastPoll() {
   }, 3000);
 }
 
+// ── TX Mode Tabs ──────────────────────────────────────────────────────
+export function switchTxTab(mode) {
+  const isAgent = mode === 'agent';
+  document.getElementById('tx-panel-simple').style.display = isAgent ? 'none' : '';
+  document.getElementById('tx-panel-agent').style.display  = isAgent ? '' : 'none';
+  document.getElementById('tx-tab-simple').style.opacity = isAgent ? '0.5' : '1';
+  document.getElementById('tx-tab-agent').style.opacity  = isAgent ? '1' : '0.5';
+
+  if (isAgent) {
+    // Pre-fill agent key + wallet from simple form
+    const agentKey = document.getElementById('tx-api-key').value;
+    if (agentKey) document.getElementById('ai-api-key').value = agentKey;
+    const wallet = document.getElementById('tx-wallet').value;
+    const aiWallet = document.getElementById('ai-wallet');
+    if (aiWallet && wallet) aiWallet.value = wallet;
+    // Ensure input is never stuck disabled when switching tabs
+    const chatInput = document.getElementById('ai-chat-input');
+    if (chatInput) chatInput.disabled = false;
+    const sendBtn = document.getElementById('ai-chat-send');
+    if (sendBtn) sendBtn.disabled = false;
+    _initInstructionChat();
+  }
+}
+
+// ── Agent Instruction Chat ────────────────────────────────────────────
+const _instrState = { messages: [], plan: null };
+const _INSTR_GREETING = "Hi! I'm your on-chain agent. Tell me what to do — e.g. \"buy WBTC with 0.005 ETH on Uniswap\" or \"send 0.001 ETH to alice\".";
+
+function _initInstructionChat() {
+  if (_instrState.messages.length === 0) {
+    _renderInstrMessages([]);
+  }
+}
+
+export async function sendInstructionMessage() {
+  const input = document.getElementById('ai-chat-input');
+  const msg = input.value.trim();
+  if (!msg) return;
+
+  const apiKey = document.getElementById('ai-api-key').value.trim();
+  if (!apiKey) { toast('API key is required', 'error'); return; }
+
+  input.value = '';
+  input.disabled = true;
+  const sendBtn = document.getElementById('ai-chat-send');
+  if (sendBtn) sendBtn.disabled = true;
+
+  // Hide plan card while processing new message
+  document.getElementById('ai-plan-card').style.display = 'none';
+  _instrState.plan = null;
+
+  _renderInstrMessages([..._instrState.messages, { role: 'user', content: msg }], true);
+
+  const fromAddress = document.getElementById('ai-wallet').value;
+
+  try {
+    const r = await fetch(`${API}/agent-instruction`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-API-Key': apiKey },
+      body: JSON.stringify({
+        instruction: msg,
+        from_address: fromAddress,
+        messages: _instrState.messages,
+      }),
+    });
+    const data = await r.json();
+    if (!r.ok) { toast('Agent error: ' + (data.detail || '?'), 'error'); _renderInstrMessages(_instrState.messages); return; }
+
+    _instrState.messages = data.messages;
+    _renderInstrMessages(_instrState.messages);
+
+    if (data.type === 'plan' && data.plan) {
+      _instrState.plan = data.plan;
+      _applyPlanCard(data.plan);
+    }
+  } catch (err) {
+    toast('Network error: ' + err.message, 'error');
+    _renderInstrMessages(_instrState.messages);
+  } finally {
+    input.disabled = false;
+    if (sendBtn) sendBtn.disabled = false;
+    input.focus();
+  }
+}
+
+// Lightweight markdown → safe HTML (escape first, then convert syntax)
+function _mdToHtml(text) {
+  // 1. Escape HTML entities to prevent XSS
+  let s = esc(text);
+  // 2. Bold: **text**
+  s = s.replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>');
+  // 3. Italic: *text* (single, not already handled)
+  s = s.replace(/(?<!\*)\*([^*\n]+)\*(?!\*)/g, '<em>$1</em>');
+  // 4. Bullet list items (- or *)
+  s = s.replace(/^[-*] (.+)$/gm, '<li style="margin:2px 0">$1</li>');
+  // 5. Numbered list items
+  s = s.replace(/^\d+\. (.+)$/gm, '<li style="margin:2px 0">$1</li>');
+  // 6. Wrap adjacent <li> blocks in <ul>
+  s = s.replace(/((<li[^>]*>.*<\/li>\n?)+)/g, '<ul style="margin:4px 0;padding-left:18px">$1</ul>');
+  // 7. Remaining newlines → <br>
+  s = s.replace(/\n/g, '<br>');
+  return s;
+}
+
+function _renderInstrMessages(messages, pending = false) {
+  const container = document.getElementById('ai-chat-messages');
+  if (!container) return;
+  const all = [{ role: 'assistant', content: _INSTR_GREETING }, ...messages];
+  container.innerHTML = all.map(m => {
+    const isBot = m.role === 'assistant';
+    const align = isBot ? 'flex-start' : 'flex-end';
+    const bg     = isBot ? 'rgba(6,182,212,.1)'    : 'rgba(139,92,246,.15)';
+    const border = isBot ? '1px solid rgba(6,182,212,.2)' : '1px solid rgba(139,92,246,.2)';
+    return `<div style="display:flex;justify-content:${align};margin-bottom:8px">
+      <div style="max-width:85%;background:${bg};border:${border};border-radius:10px;padding:8px 12px;font-size:12px;color:var(--fg);line-height:1.5">${_mdToHtml(m.content)}</div>
+    </div>`;
+  }).join('') + (pending ? `<div style="display:flex;justify-content:flex-start;margin-bottom:8px">
+    <div style="background:rgba(6,182,212,.1);border:1px solid rgba(6,182,212,.2);border-radius:10px;padding:8px 12px;font-size:12px;color:var(--muted)">⏳ Thinking…</div>
+  </div>` : '');
+  container.scrollTop = container.scrollHeight;
+}
+
+function _applyPlanCard(plan) {
+  const card = document.getElementById('ai-plan-card');
+  document.getElementById('ai-plan-addr').textContent = plan.to_address || '';
+  const eth = plan.value_wei ? (parseInt(plan.value_wei) / 1e18).toFixed(6) : '0';
+  document.getElementById('ai-plan-amount').textContent = `${eth} ${plan.asset || 'ETH'}`;
+  document.getElementById('ai-plan-note').textContent = plan.note || '';
+  const humanEl = document.getElementById('ai-plan-needs-human');
+  humanEl.textContent = plan.needs_human ? '⚠ Needs Approval' : '✓ Auto';
+  humanEl.style.background = plan.needs_human ? 'rgba(245,158,11,.15)' : 'rgba(34,197,94,.1)';
+  humanEl.style.color = plan.needs_human ? 'var(--amber)' : 'var(--green)';
+  const ul = document.getElementById('ai-plan-reasoning');
+  ul.innerHTML = (plan.reasoning || []).map(r => `<li>${esc(r)}</li>`).join('');
+  card.style.display = '';
+}
+
+export async function submitPlannedIntent() {
+  if (!_instrState.plan) return;
+  const plan = _instrState.plan;
+
+  const apiKey = document.getElementById('ai-api-key').value.trim();
+  if (!apiKey) { toast('API key is required', 'error'); return; }
+
+  const confirmBtn  = document.getElementById('ai-plan-confirm');
+  const confirmText = document.getElementById('ai-plan-confirm-text');
+  const confirmSpin = document.getElementById('ai-plan-confirm-spin');
+  confirmBtn.disabled = true;
+  confirmText.textContent = 'Submitting…';
+  confirmSpin.style.display = 'inline-block';
+
+  const fromAddress = document.getElementById('ai-wallet').value;
+  state.intentCounter++;
+  const intentId = `agent-${Date.now()}-${state.intentCounter}`;
+
+  // Normalise values to pass server-side validation
+  const SUPPORTED_ASSETS = new Set(['ETH', 'USDC', 'USDT', 'WBTC', 'WETH', 'DAI', 'SOL', 'BTC', 'ZEC', 'ADA']);
+  const asset = SUPPORTED_ASSETS.has(plan.asset) ? plan.asset : 'ETH';
+  // Ensure amount_wei is a clean positive integer string (Z.AI may return floats/sci notation)
+  const amountWei = BigInt(Math.round(parseFloat(plan.value_wei || '0'))).toString();
+
+  if (amountWei === '0') {
+    toast('✗ Agent returned zero amount — ask again with a specific amount (e.g. "0.005 ETH")', 'error');
+    confirmBtn.disabled = false;
+    confirmText.textContent = '✅ Confirm & Submit Intent';
+    confirmSpin.style.display = 'none';
+    return;
+  }
+
+  const intentBody = {
+    intent_id:    intentId,
+    from_user:    'agent',
+    to_user:      'contract',
+    to_address:   plan.to_address,
+    from_address: fromAddress,
+    amount_wei:   amountWei,
+    note:         plan.note,
+    chain:        'sepolia',
+    asset,
+  };
+  console.log('Submitting intent:', intentBody);
+
+  try {
+    const r = await fetch(`${API}/intent`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-API-Key': apiKey },
+      body: JSON.stringify(intentBody),
+    });
+    const data = await r.json();
+    if (r.ok) {
+      toast(`✓ ${intentId} submitted`, 'success');
+      document.getElementById('ai-plan-card').style.display = 'none';
+      _instrState.plan = null;
+      _instrState.messages = [];
+      _renderInstrMessages([]);
+      fetchIntents();
+      startFastPoll();
+    } else {
+      const detail = data.detail;
+      const msg = Array.isArray(detail)
+        ? detail.map(e => `${e.loc ? e.loc.slice(-1)[0] : '?'}: ${e.msg}`).join(' | ')
+        : (typeof detail === 'string' ? detail : JSON.stringify(data));
+      toast('✗ ' + msg, 'error');
+      console.error('422 detail:', data);
+    }
+  } catch (err) {
+    toast('✗ Network error: ' + err.message, 'error');
+  } finally {
+    confirmBtn.disabled = false;
+    confirmText.textContent = '✅ Confirm & Submit Intent';
+    confirmSpin.style.display = 'none';
+  }
+}
+
+export function toggleAiKeyVisibility() {
+  const input = document.getElementById('ai-api-key');
+  const eye   = document.getElementById('ai-key-eye');
+  if (!input || !eye) return;
+  if (input.type === 'password') { input.type = 'text'; eye.textContent = '🙈'; }
+  else                           { input.type = 'password'; eye.textContent = '👁'; }
+}
+
+// Sync AI wallet dropdown with the simple form's wallet list
+export function syncAiWalletDropdown() {
+  const src = document.getElementById('tx-wallet');
+  const dst = document.getElementById('ai-wallet');
+  if (!src || !dst) return;
+  dst.innerHTML = src.innerHTML;
+}
+
 // Expose to inline onclick handlers
-window.setFilter   = setFilter;
-window.fetchIntents = fetchIntents;
+window.setFilter              = setFilter;
+window.fetchIntents           = fetchIntents;
+window.switchTxTab            = switchTxTab;
+window.sendInstructionMessage = sendInstructionMessage;
+window.submitPlannedIntent    = submitPlannedIntent;
+window.toggleAiKeyVisibility  = toggleAiKeyVisibility;
 
 // ── TX API Key Visibility Toggle ─────────────────────────────────────
 export function toggleTxKeyVisibility() {

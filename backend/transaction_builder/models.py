@@ -17,7 +17,7 @@ _EVM_ADDRESS_RE = re.compile(r"^0x[0-9a-fA-F]{40}$")
 # ── Extensible sets for multi-chain support ──────────────────────────────────
 # Chain packages add to these sets when imported (see chains/ package).
 SUPPORTED_CHAINS: set[str] = {"sepolia", "base"}
-SUPPORTED_ASSETS: set[str] = {"ETH", "USDC", "USDT", "SOL", "BTC", "ZEC", "ADA"}
+SUPPORTED_ASSETS: set[str] = {"ETH", "USDC", "USDT", "WBTC", "WETH", "DAI", "SOL", "BTC", "ZEC", "ADA"}
 
 # Address regex per chain family (used by the validator below)
 _ADDRESS_PATTERNS: dict[str, re.Pattern] = {

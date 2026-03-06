@@ -26,6 +26,9 @@ export async function fetchWallets() {
     } else {
       sel.innerHTML = '<option value="">Default wallet</option>';
     }
+    // Keep agent instruction dropdown in sync
+    const aiSel = document.getElementById('ai-wallet');
+    if (aiSel) aiSel.innerHTML = sel.innerHTML;
   } catch (e) { console.error('Fetch wallets:', e); }
 }
 

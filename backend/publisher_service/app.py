@@ -42,8 +42,11 @@ from publisher_service.api_user_models import (
     GeneratePolicyResponse,
     PolicyChatRequest,
     PolicyChatResponse,
+    AgentInstructionRequest,
+    AgentInstructionResponse,
 )
 import publisher_service.zai_policy_client as zai_policy_client
+import publisher_service.zai_instruction_client as zai_instruction_client
 from publisher_service.wallet_models import (
     AddWallet,
     WalletResponse,
@@ -608,6 +611,119 @@ async def policy_chat_endpoint(body: PolicyChatRequest):
         logger.error("Policy chat failed: %s", exc)
         raise HTTPException(status_code=502, detail=f"Policy chat failed: {exc}")
     return PolicyChatResponse(**result)
+
+
+@app.post("/agent-instruction", response_model=AgentInstructionResponse)
+async def agent_instruction_endpoint(request: Request, body: AgentInstructionRequest, _key=Depends(require_api_key)):
+    """
+    Multi-turn agentic instruction chat. The agent receives the user's natural-language
+    instruction along with injected context (wallet balances, recent trades, policy)
+    and reasons about what on-chain action to take via Z.AI GLM.
+
+    Returns a conversational message or a structured TransactionPlan ready to submit.
+    """
+    if not config.ZAI_API_KEY:
+        raise HTTPException(status_code=503, detail="ZAI_API_KEY is not configured on this server")
+
+    api_user = getattr(request.state, "api_user", None)
+
+    # ── Fetch wallet balances (ETH + known ERC-20s) ───────────────────────────
+    import httpx
+    wallet_balances: list[dict] = []
+    if body.from_address:
+        # ERC-20 tokens to check on Sepolia: symbol → (contract, decimals)
+        _ERC20 = {
+            "USDC": ("0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238", 6),
+            "WETH": ("0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14", 18),
+            "DAI":  ("0x68194a729C2450ad26072b3D33ADaCbcef39D574", 18),
+        }
+        # balanceOf(address) selector = 0x70a08231, address padded to 32 bytes
+        addr_padded = body.from_address.lower().replace("0x", "").zfill(64)
+        call_data = "0x70a08231" + addr_padded
+
+        batch = [
+            {"jsonrpc": "2.0", "method": "eth_getBalance",
+             "params": [body.from_address, "latest"], "id": 0},
+            *[
+                {"jsonrpc": "2.0", "method": "eth_call",
+                 "params": [{"to": token_info[0], "data": call_data}, "latest"], "id": idx + 1}
+                for idx, token_info in enumerate(_ERC20.values())
+            ]
+        ]
+        try:
+            async with httpx.AsyncClient(timeout=8.0) as client:
+                resp = await client.post(
+                    config.SEPOLIA_RPC_URL,
+                    json=batch,
+                    headers={"Content-Type": "application/json"},
+                )
+            results = {r["id"]: r.get("result", "0x0") for r in resp.json()}
+            # ETH
+            bal_hex = results.get(0, "0x0")
+            bal_eth = int(bal_hex, 16) / 1e18
+            wallet_balances.append({"symbol": "ETH", "balance_display": f"{bal_eth:.6f}"})
+            # ERC-20s — only include if balance > 0
+            for idx, (symbol, (_, decimals)) in enumerate(_ERC20.items()):
+                raw = results.get(idx + 1, "0x0")
+                try:
+                    amount = int(raw, 16) / (10 ** decimals)
+                except (ValueError, TypeError):
+                    amount = 0
+                if amount > 0:
+                    wallet_balances.append({"symbol": symbol, "balance_display": f"{amount:.4f}"})
+        except Exception as exc:
+            logger.warning("Balance fetch for instruction failed: %s", exc)
+
+    # ── Fetch recent intents for this agent ───────────────────────────────────
+    recent_intents: list[dict] = []
+    if api_user:
+        try:
+            recent_intents = db.list_intents_by_agent(api_user["id"])[:5]
+        except Exception:
+            pass
+    else:
+        try:
+            recent_intents = db.list_intents()[:5]
+        except Exception:
+            pass
+
+    # ── Build agent policy context ────────────────────────────────────────────
+    agent_policy: dict = {}
+    if api_user:
+        agent_policy = {
+            "allowed_contracts": api_user.get("allowed_contracts", ["*"]),
+            "allowed_assets":    api_user.get("allowed_assets", ["*"]),
+            "max_amount_wei":    api_user.get("max_amount_wei", "0"),
+            "approval_mode":     api_user.get("approval_mode", "always_human"),
+        }
+
+    # ── Call Z.AI with full context ───────────────────────────────────────────
+    try:
+        result = await zai_instruction_client.instruction_chat(
+            messages=[m.model_dump() for m in body.messages],
+            user_message=body.instruction,
+            from_address=body.from_address,
+            wallet_balances=wallet_balances,
+            recent_intents=recent_intents,
+            agent_policy=agent_policy,
+        )
+    except Exception as exc:
+        logger.error("Instruction chat failed: %s", exc)
+        raise HTTPException(status_code=502, detail=f"Instruction chat failed: {exc}")
+
+    return AgentInstructionResponse(
+        type=result["type"],
+        content=result.get("content"),
+        plan=result.get("plan"),
+        messages=result["messages"],
+        model_used=config.ZAI_MODEL,
+    )
+
+
+@app.get("/agent-instruction/greeting")
+async def agent_instruction_greeting():
+    """Return the greeting message for the instruction chat panel."""
+    return {"greeting": zai_instruction_client.greeting()}
 
 
 @app.post("/api-users", response_model=ApiUserCreatedResponse, status_code=201,

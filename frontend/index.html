@@ -277,6 +277,16 @@
           <div class="wa"><button class="w-btn" onclick="toggleWidget(this)">−</button></div>
         </div>
         <div class="wb pad">
+          <!-- Mode tabs -->
+          <div style="display:flex;gap:6px;margin-bottom:14px;border-bottom:1px solid rgba(255,255,255,.07);padding-bottom:10px">
+            <button id="tx-tab-simple" class="btn btn-outline" style="flex:1;font-size:11px;padding:5px 0"
+              onclick="switchTxTab('simple')">💸 Simple Payment</button>
+            <button id="tx-tab-agent" class="btn btn-outline" style="flex:1;font-size:11px;padding:5px 0"
+              onclick="switchTxTab('agent')">🤖 Agent Instruction</button>
+          </div>
+
+          <!-- ── Simple Payment (existing form, unchanged) ── -->
+          <div id="tx-panel-simple">
           <form id="txForm" autocomplete="off">
             <div class="form-stack">
               <div class="form-group">
@@ -339,6 +349,65 @@
               </button>
             </div>
           </form>
+          </div><!-- /tx-panel-simple -->
+
+          <!-- ── Agent Instruction Panel ── -->
+          <div id="tx-panel-agent" style="display:none">
+            <!-- API key + wallet -->
+            <div class="form-stack" style="margin-bottom:10px">
+              <div class="form-group">
+                <label>🔑 Agent API Key <span style="color:var(--red)">*</span></label>
+                <div style="position:relative">
+                  <input type="password" id="ai-api-key" placeholder="Enter your agent API key" style="padding-right:36px">
+                  <button type="button" class="w-btn" onclick="toggleAiKeyVisibility()"
+                    title="Show/Hide" style="position:absolute;right:4px;top:50%;transform:translateY(-50%);font-size:14px;z-index:2" id="ai-key-eye">👁</button>
+                </div>
+                <div class="form-hint" style="color:var(--amber)">⚠️ Wallet balance &amp; policy loaded from this key</div>
+              </div>
+              <div class="form-group">
+                <label>From Wallet</label>
+                <select id="ai-wallet"><option value="">Default wallet</option></select>
+              </div>
+            </div>
+
+            <!-- Chat panel — same style as AI Policy Setup -->
+            <div style="border:1px solid rgba(6,182,212,.25);border-radius:10px;background:rgba(6,182,212,.04);overflow:hidden">
+              <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid rgba(6,182,212,.15)">
+                <span style="font-size:12px;font-weight:600;color:var(--cyan)">🤖 Agent Instruction</span>
+                <span style="font-size:10px;color:var(--muted)">Z.AI · wallet-aware</span>
+              </div>
+              <div id="ai-chat-messages" style="height:240px;overflow-y:auto;padding:12px 14px;display:flex;flex-direction:column"></div>
+
+              <!-- Plan preview card (hidden until Z.AI returns a plan) -->
+              <div id="ai-plan-card" style="display:none;margin:0 14px 10px;background:rgba(139,92,246,.08);border:1px solid rgba(139,92,246,.25);border-radius:8px;padding:10px;font-size:11px">
+                <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
+                  <strong style="color:var(--purple,#8b5cf6)">Transaction Plan</strong>
+                  <span id="ai-plan-needs-human" style="margin-left:auto;font-size:9px;padding:2px 7px;border-radius:4px"></span>
+                </div>
+                <div style="margin-bottom:3px"><strong>To:</strong> <span id="ai-plan-addr" class="mono" style="font-size:10px"></span></div>
+                <div style="margin-bottom:3px"><strong>Amount:</strong> <span id="ai-plan-amount"></span></div>
+                <div style="margin-bottom:6px"><strong>Action:</strong> <span id="ai-plan-note"></span></div>
+                <ul id="ai-plan-reasoning" style="margin:0 0 8px;padding-left:16px;color:var(--muted);line-height:1.7"></ul>
+                <button class="btn btn-primary" id="ai-plan-confirm" onclick="submitPlannedIntent()" style="width:100%;font-size:11px">
+                  <span id="ai-plan-confirm-text">✅ Confirm &amp; Submit Intent</span>
+                  <span id="ai-plan-confirm-spin" style="display:none" class="status-spinner"></span>
+                </button>
+              </div>
+
+              <div style="display:flex;gap:8px;padding:10px 14px;border-top:1px solid rgba(6,182,212,.15)">
+                <input type="text" id="ai-chat-input"
+                  placeholder="e.g. buy WBTC with 0.005 ETH on Uniswap"
+                  style="flex:1;font-size:12px"
+                  onkeydown="if(event.key==='Enter'){event.preventDefault();sendInstructionMessage();}">
+                <button type="button" id="ai-chat-send" onclick="sendInstructionMessage()"
+                  class="btn btn-outline" style="white-space:nowrap;padding:6px 14px;font-size:11px;border-color:rgba(6,182,212,.35);color:var(--cyan)">
+                  Send
+                </button>
+              </div>
+            </div>
+            <div class="form-hint" style="margin-top:6px">Agent checks your wallet balance, recent trades &amp; policy before planning.</div>
+          </div><!-- /tx-panel-agent -->
+
         </div>
       </div>
 
@@ -386,12 +455,12 @@
               <button type="submit" class="btn btn-primary" style="width:100%" id="wlAddBtn">👛 Add Wallet</button>
             </div>
           </form>
-          <div id="walletList" style="margin-top:10px">
+          <!-- <div id="walletList" style="margin-top:10px">
             <div class="empty-state" id="walletEmpty">
               <div class="icon">👛</div>
               <p>No wallets added yet</p>
             </div>
-          </div>
+          </div> -->
         </div>
       </div>
 

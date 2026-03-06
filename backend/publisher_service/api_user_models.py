@@ -188,3 +188,34 @@ class ApiUserUsageResponse(BaseModel):
     today_request_count: int
     daily_limit_wei: str
     limit_remaining_wei: str
+
+
+# ── Agent Instruction Chat ─────────────────────────────────────────────────────
+
+class InstructionChatMessage(BaseModel):
+    role: Literal["user", "assistant"]
+    content: str
+
+
+class AgentInstructionRequest(BaseModel):
+    instruction: str = Field(..., min_length=1, max_length=1000)
+    from_address: str = Field(default="", description="Wallet address the agent is acting from")
+    messages: list[InstructionChatMessage] = Field(default=[])
+
+
+class TransactionPlan(BaseModel):
+    """Structured transaction plan returned by Z.AI when it has enough info."""
+    to_address: str
+    value_wei: str
+    asset: str
+    note: str
+    reasoning: list[str]
+    needs_human: bool
+
+
+class AgentInstructionResponse(BaseModel):
+    type: Literal["message", "plan"]
+    content: Optional[str] = None
+    plan: Optional[TransactionPlan] = None
+    messages: list[dict]
+    model_used: str
