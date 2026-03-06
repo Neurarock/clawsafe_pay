@@ -38,7 +38,7 @@ Asset/chain guidelines:
 - Extract specific token symbols mentioned in the goal (e.g. "wBTC", "USDT", "ETH", "USDC", "SOL")
 - Use uppercase for token symbols: "ETH", "WBTC", "USDT", "USDC", "DAI", "SOL", "BTC"
 - If no specific assets mentioned, use ["*"]
-- For chains: use slugs like "mainnet", "base", "sepolia", "solana", "arbitrum", "optimism"
+- For chains: use slugs like "mainnet", "base", "sepolia", "solana", "arbitrum", "optimism". If all chains are allowed, use ["*"].
 - If no specific chain mentioned or it's general DeFi, use ["*"]
 
 Wei reference values:
