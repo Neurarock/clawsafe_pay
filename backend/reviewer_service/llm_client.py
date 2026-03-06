@@ -41,7 +41,12 @@ Transaction details:
 {calldata_section}
 Check for:
 1. Gas fee manipulation — is max_fee_per_gas unreasonably high vs the base fee?
-   (> 3x base fee = WARN, > 10x base fee = BLOCK)
+   IMPORTANT: On testnets like Sepolia the base fee can drop to near-zero
+   (single-digit wei).  When the base fee is below 1 gwei (1000000000 wei),
+   use 1 gwei as the effective floor for ratio comparisons — a high ratio
+   against a near-zero base fee is normal EIP-1559 behaviour, NOT manipulation.
+   Only flag ratios computed against realistically-sized base fees.
+   (> 3x effective base fee = WARN, > 10x effective base fee = BLOCK)
 2. Unusual or suspicious transfer amount.
 3. Any other transaction anomalies.
 {calldata_checks}

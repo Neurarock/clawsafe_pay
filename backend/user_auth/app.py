@@ -23,7 +23,12 @@ from fastapi.responses import JSONResponse
 from user_auth import database as db
 from user_auth import telegram_bot, signer_callback
 from user_auth import telegram_poller, telegram_handler
-from user_auth.config import AUTH_REQUEST_TTL_SECONDS
+from user_auth import telegram_webhook_setup
+from user_auth.config import (
+    AUTH_REQUEST_TTL_SECONDS,
+    TELEGRAM_WEBHOOK_URL,
+    TELEGRAM_WEBHOOK_SECRET,
+)
 from user_auth.models import AuthRequest, AuthResponse, AuthStatusResponse, TelegramUpdate
 from user_auth.security import verify_hmac
 
@@ -70,23 +75,41 @@ async def lifespan(app: FastAPI):
     db.init_db()
     logger.info("Database initialised")
     task = asyncio.create_task(_expire_stale_requests())
-    # start telegram poller (fallback when webhook isn't configured)
+
+    # Telegram: prefer webhook mode if TELEGRAM_WEBHOOK_URL is configured,
+    # otherwise fall back to long-polling.
     stop_event = asyncio.Event()
-    poller_task = asyncio.create_task(telegram_poller.run_poller(stop_event))
+    poller_task = None
+
+    if TELEGRAM_WEBHOOK_URL:
+        ok = await telegram_webhook_setup.register_webhook()
+        if ok:
+            logger.info("Webhook mode active — long-polling disabled")
+        else:
+            logger.warning("Webhook registration failed — falling back to long-polling")
+            poller_task = asyncio.create_task(telegram_poller.run_poller(stop_event))
+    else:
+        # Ensure no stale webhook blocks getUpdates
+        await telegram_webhook_setup.delete_webhook()
+        poller_task = asyncio.create_task(telegram_poller.run_poller(stop_event))
+        logger.info("Long-polling mode active (set TELEGRAM_WEBHOOK_URL for webhook mode)")
+
     yield
+
     # Shutdown
     task.cancel()
     try:
         await task
     except asyncio.CancelledError:
         pass
-    # stop poller
+    # stop poller if running
     stop_event.set()
-    poller_task.cancel()
-    try:
-        await poller_task
-    except asyncio.CancelledError:
-        pass
+    if poller_task:
+        poller_task.cancel()
+        try:
+            await poller_task
+        except asyncio.CancelledError:
+            pass
 
 app = FastAPI(
     title="ClawSafe Pay – User Auth Service",
@@ -180,8 +203,15 @@ async def get_auth_status(request_id: str):
 
 
 @app.post("/telegram/webhook")
-async def telegram_webhook(update: TelegramUpdate):
+async def telegram_webhook(update: TelegramUpdate, request: Request):
     """Receive Telegram inline-keyboard callback queries via webhook."""
+    # Verify secret token if configured (prevents spoofed webhook calls)
+    if TELEGRAM_WEBHOOK_SECRET:
+        header_secret = request.headers.get("x-telegram-bot-api-secret-token", "")
+        if header_secret != TELEGRAM_WEBHOOK_SECRET:
+            logger.warning("Telegram webhook: invalid secret token")
+            raise HTTPException(status_code=403, detail="Invalid secret token")
+
     cq = update.callback_query
     if not cq:
         return {"ok": True}
@@ -195,3 +225,55 @@ async def telegram_webhook(update: TelegramUpdate):
         logger.exception("Failed to schedule telegram callback processing")
 
     return {"ok": True}
+
+
+# ── Admin endpoints ─────────────────────────────────────────────────────────
+
+@app.post("/admin/webhook/register")
+async def admin_register_webhook(request: Request):
+    """
+    Register (or update) the Telegram webhook URL.
+
+    Accepts optional JSON body: {"url": "https://..."}
+    Falls back to TELEGRAM_WEBHOOK_URL from config.
+    """
+    body = {}
+    try:
+        body = await request.json()
+    except Exception:
+        pass
+
+    url = body.get("url") or TELEGRAM_WEBHOOK_URL
+    if not url:
+        raise HTTPException(
+            status_code=400,
+            detail="Provide 'url' in request body or set TELEGRAM_WEBHOOK_URL env var",
+        )
+
+    ok = await telegram_webhook_setup.register_webhook(url=url)
+    if not ok:
+        raise HTTPException(status_code=502, detail="Telegram API rejected webhook registration")
+    return {"ok": True, "webhook_url": url, "mode": "webhook"}
+
+
+@app.delete("/admin/webhook")
+async def admin_delete_webhook():
+    """Remove the Telegram webhook (switches bot to long-polling)."""
+    ok = await telegram_webhook_setup.delete_webhook()
+    if not ok:
+        raise HTTPException(status_code=502, detail="Failed to remove Telegram webhook")
+    return {"ok": True, "mode": "polling"}
+
+
+@app.get("/admin/webhook/info")
+async def admin_webhook_info():
+    """Return current Telegram webhook status."""
+    info = await telegram_webhook_setup.get_webhook_info()
+    return {
+        "url": info.get("url", ""),
+        "has_custom_certificate": info.get("has_custom_certificate", False),
+        "pending_update_count": info.get("pending_update_count", 0),
+        "last_error_date": info.get("last_error_date"),
+        "last_error_message": info.get("last_error_message"),
+        "mode": "webhook" if info.get("url") else "polling",
+    }

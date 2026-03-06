@@ -14,6 +14,17 @@ load_dotenv(Path(__file__).resolve().parent.parent.parent / ".env")
 TELEGRAM_BOT_TOKEN: str = os.getenv("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_CHAT_ID: str = os.getenv("TELEGRAM_CHAT_ID", "")
 
+# --- Telegram Webhook ---
+# When set, the bot registers this URL as a Telegram webhook on startup
+# and disables long-polling.  Leave empty for local dev (long-polling).
+# Example: https://your-domain.com/telegram/webhook
+TELEGRAM_WEBHOOK_URL: str = os.getenv("TELEGRAM_WEBHOOK_URL", "")
+
+# Secret token sent by Telegram in the X-Telegram-Bot-Api-Secret-Token header.
+# Auto-generated on first startup if empty.  Must be stable across restarts
+# for Vercel / serverless (set it explicitly in .env for production).
+TELEGRAM_WEBHOOK_SECRET: str = os.getenv("TELEGRAM_WEBHOOK_SECRET", "")
+
 # --- Signer Service Callback ---
 SIGNER_SERVICE_CALLBACK_URL: str = os.getenv(
     "SIGNER_SERVICE_CALLBACK_URL",

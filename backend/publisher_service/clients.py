@@ -22,7 +22,12 @@ from publisher_service.models import (
 
 logger = logging.getLogger("publisher_service.clients")
 
+# Default timeout for signer calls
 _TIMEOUT = httpx.Timeout(connect=10.0, read=30.0, write=10.0, pool=5.0)
+
+# Longer timeout for reviewer — the reviewer itself calls Z.AI which can
+# take up to ZAI_TIMEOUT_SECONDS (default 30 s) so we need headroom.
+_REVIEWER_TIMEOUT = httpx.Timeout(connect=10.0, read=45.0, write=10.0, pool=5.0)
 
 
 class DownstreamError(Exception):
@@ -45,7 +50,7 @@ async def call_reviewer(
         "current_base_fee_wei": current_base_fee_wei,
         "calldata_description": calldata_description,
     }
-    async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
+    async with httpx.AsyncClient(timeout=_REVIEWER_TIMEOUT) as client:
         try:
             resp = await client.post(url, json=payload)
         except httpx.HTTPError as exc:
