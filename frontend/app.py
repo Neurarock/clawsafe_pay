@@ -40,6 +40,16 @@ app.add_middleware(
 )
 
 
+@app.middleware("http")
+async def no_cache_static(request: Request, call_next):
+    """Prevent browsers from caching stale JS/CSS after rebuilds."""
+    response = await call_next(request)
+    if request.url.path.startswith("/static/") or request.url.path == "/config.js":
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        response.headers["Pragma"] = "no-cache"
+    return response
+
+
 # ── Health check ─────────────────────────────────────────────────────────────
 
 
@@ -77,7 +87,10 @@ async def publisher_proxy(path: str, request: Request):
     if request.url.query:
         upstream = f"{upstream}?{request.url.query}"
 
-    headers = {"X-API-Key": config.PUBLISHER_API_KEY}
+    # Forward the browser's X-API-Key (agent key) when present;
+    # fall back to admin key for non-transaction requests.
+    browser_api_key = request.headers.get("x-api-key")
+    headers = {"X-API-Key": browser_api_key or config.PUBLISHER_API_KEY}
     content_type = request.headers.get("content-type")
     if content_type:
         headers["Content-Type"] = content_type

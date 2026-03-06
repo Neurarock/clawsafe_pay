@@ -164,6 +164,16 @@ export function setupTxForm() {
     txApiKeyInput.value = DEFAULT_AGENT_KEY;
   }
 
+  // Wire up the eye-toggle button via addEventListener (more reliable than inline onclick)
+  const eyeBtn = document.getElementById('tx-key-eye');
+  if (eyeBtn) {
+    eyeBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      toggleTxKeyVisibility();
+    });
+  }
+
   document.getElementById('txForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     const btn     = document.getElementById('txBtn');
@@ -243,6 +253,7 @@ window.fetchIntents = fetchIntents;
 export function toggleTxKeyVisibility() {
   const input = document.getElementById('tx-api-key');
   const eye   = document.getElementById('tx-key-eye');
+  if (!input || !eye) return;
   if (input.type === 'password') {
     input.type = 'text';
     eye.textContent = '\uD83D\uDE48';
