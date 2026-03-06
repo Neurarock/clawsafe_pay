@@ -1,7 +1,9 @@
 # ClawSafe Pay — Frontend (Dashboard)
 
 Standalone frontend service for the ClawSafe Pay demo dashboard, running on port **8008**.
-Payment API calls go cross-origin to the `publisher_service` on port **8002**.
+Payment API calls are proxied through this service to `publisher_service` on port **8002**.
+Telegram webhook callbacks and user_auth admin endpoints are also proxied here,
+enabling the entire system to be exposed via a single ngrok tunnel.
 Feed proxies (crypto prices, crypto news, Moltbook) are served directly by this service.
 
 ---
@@ -65,6 +67,8 @@ The service is a lightweight FastAPI app (`dashboard/app.py`) that serves the HT
 | `/crypto-prices` | Proxy → CoinGecko API |
 | `/crypto-news` | Proxy → RSS aggregation |
 | `/moltbook-feed` | Proxy → Moltbook API |
+| `/telegram/{path}` | Proxy → user_auth (Telegram webhook callbacks) |
+| `/user-auth/{path}` | Proxy → user_auth (admin & health endpoints) |
 | `/static/*` | `src/` directory (StaticFiles mount) |
 | `/dashboard/logo.png` | `src/logo.png` |
 | `/health` | Health check |
@@ -87,6 +91,29 @@ Environment variables (set in `.env` at the project root):
 | `DASHBOARD_PORT` | `8008` | Port the dashboard service listens on |
 | `PUBLISHER_API_URL` | `http://localhost:8002` | Publisher service base URL |
 | `PUBLISHER_API_KEY` | `change-me-publisher-key` | API key injected into frontend config |
+| `USER_AUTH_INTERNAL_URL` | `http://localhost:8000` | Internal URL for user_auth service (used by proxy routes) |
+
+---
+
+## Ngrok Single-Tunnel Setup
+
+Expose the entire platform through a single ngrok tunnel:
+
+```bash
+ngrok http 8008
+```
+
+The frontend proxies requests to internal services:
+
+| Public path | Internal target | Purpose |
+| --- | --- | --- |
+| `/publisher/*` | `publisher_service:8002` | Payment API (intents, wallets, agents) |
+| `/telegram/*` | `user_auth:8000` | Telegram webhook callbacks |
+| `/user-auth/*` | `user_auth:8000` | Admin & health endpoints |
+| `/*` | `frontend:8008` | Dashboard, pages, static assets |
+
+Set `TELEGRAM_WEBHOOK_URL=https://<subdomain>.ngrok-free.dev/telegram/webhook`
+in `.env` so user_auth auto-registers via the proxy.
 
 ---
 

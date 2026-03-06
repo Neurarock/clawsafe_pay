@@ -30,6 +30,9 @@ It accepts a `PaymentIntent`, builds a draft Sepolia transaction, gets reviewer 
 
 All intent endpoints require `X-API-Key`.
 
+**Rate limiting**: 600 requests per minute per IP. The `/health`, `/docs`,
+and `/openapi.json` endpoints are exempt from rate limiting.
+
 ### Agent Management (admin-only)
 
 | Method | Path | Description |
@@ -99,6 +102,7 @@ Terminal error/decision states:
 
 - Policy enforcement happens during draft build (amount caps, allowlist, gas/fee constraints).
 - Reviewer `BLOCK` stops the flow.
+- Reviewer call uses a dedicated 45-second read timeout (separate from the default 30-second timeout for other downstream calls).
 - Digest mismatch between draft and review is treated as a security failure.
 - Approval timeout and explicit reject are terminal states.
 - DB prevents transitions out of terminal states.
@@ -115,3 +119,10 @@ Terminal error/decision states:
 - `api_user_models.py` - Pydantic models for API user endpoints
 - `security.py` - API key + HMAC helpers
 - `config.py` - env-based configuration
+
+## Ngrok Access
+
+When the system is exposed via ngrok, the frontend on port 8008 proxies
+`/publisher/*` requests to the publisher service. The `PUBLISHER_BROWSER_URL`
+is set to the relative path `/publisher` so browser-based API calls work
+through the tunnel without hardcoding a hostname.

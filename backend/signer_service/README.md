@@ -201,7 +201,7 @@ Returns `{"status": "ok", "wallet": "<configured_address>"}`.
 | **Telegram 2FA** | Every transaction requires explicit human approval via Telegram inline buttons. |
 | **Auto-expiry** | Unapproved requests expire after 5 minutes. |
 | **No private key exposure** | The private key is only loaded from env vars and used in-memory for signing. Never logged or returned via API. |
-| **Rate limiting** | Per-IP rate limiter (20 req/min). |
+| **Rate limiting** | Per-IP rate limiter (600 req/min). |
 
 ### Wallet Key Sources
 

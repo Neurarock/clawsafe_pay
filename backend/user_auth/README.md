@@ -15,12 +15,19 @@ signer_service                  user_auth                       Telegram
      │ ──────────────────────────►  │  sendMessage (inline kbd)    │
      │                              │ ────────────────────────────► │
      │                              │                              │
-     │                              │  webhook callback_query      │
+     │                              │  webhook / long-poll update  │
      │                              │ ◄──────────────────────────── │
      │  POST /auth/callback         │                              │
      │ ◄──────────────────────────  │  editMessageText             │
      │                              │ ────────────────────────────► │
 ```
+
+### Telegram Delivery Modes
+
+| Mode | Config | Behaviour |
+| --- | --- | --- |
+| **Webhook** (recommended) | `TELEGRAM_WEBHOOK_URL` set | Auto-registered on startup. Telegram pushes updates to `/telegram/webhook`. |
+| **Long-polling** (default) | `TELEGRAM_WEBHOOK_URL` empty | Polls `getUpdates` every few seconds. Works behind NATs. |
 
 ---
 
@@ -85,21 +92,34 @@ uvicorn user_auth.app:app --reload --port 8000
 uvicorn signer_service.mock_server:app --reload --port 8001
 ```
 
-### 5. Set up the Telegram webhook
+### 5. Set up Telegram delivery
 
-Point your bot's webhook at your publicly accessible URL (use [ngrok](https://ngrok.com) for local development):
+**Option A — Webhook mode (recommended for ngrok / production)**:
 
-```bash
-ngrok http 8000
+Set these in your `.env`:
+
+```dotenv
+TELEGRAM_WEBHOOK_URL=https://<subdomain>.ngrok-free.dev/telegram/webhook
+# TELEGRAM_WEBHOOK_SECRET=<optional-random-secret>
 ```
 
-Then register the webhook with Telegram:
+The webhook is auto-registered when the service starts. No manual curl needed.
+
+**Option B — Long-polling (no public URL needed)**:
+
+Leave `TELEGRAM_WEBHOOK_URL` empty. Delete any stale webhook:
 
 ```bash
-curl -X POST "https://api.telegram.org/bot<YOUR_TOKEN>/setWebhook" \
-  -H "Content-Type: application/json" \
-  -d '{"url": "https://<NGROK_SUBDOMAIN>.ngrok-free.app/telegram/webhook"}'
+curl -X POST "https://api.telegram.org/bot<YOUR_TOKEN>/deleteWebhook"
 ```
+
+**Admin webhook management** (available in both modes):
+
+| Method | Path | Description |
+| --- | --- | --- |
+| `POST` | `/admin/webhook/register` | Register / re-register the webhook |
+| `DELETE` | `/admin/webhook` | Delete the current webhook |
+| `GET` | `/admin/webhook/info` | Show current webhook status |
 
 ---
 
@@ -198,7 +218,7 @@ curl http://localhost:8000/auth/status/abc-123
 | **HMAC-SHA256 request signing** | Every request must include a valid HMAC digest computed with a shared secret. Prevents unauthorised submissions. |
 | **Unique request ID (anti-replay)** | Each `request_id` is stored; duplicates are rejected with HTTP 409. Old authorisations cannot be reused. |
 | **Automatic expiry (TTL)** | Pending requests expire after `AUTH_REQUEST_TTL_SECONDS` (default 5 min). A background task marks them as `expired` and notifies `signer_service`. |
-| **Rate limiting** | In-memory per-IP rate limiter (30 req/min by default) protects against abuse. |
+| **Rate limiting** | In-memory per-IP rate limiter (600 req/min) protects against abuse. |
 | **Telegram message lockdown** | After a decision, the inline keyboard is removed from the Telegram message so buttons cannot be tapped again. |
 | **Constant-time HMAC comparison** | Uses `hmac.compare_digest` to prevent timing side-channel attacks. |
 
@@ -240,16 +260,19 @@ Single table `auth_requests` in SQLite:
 ```
 user_auth/
 ├── __init__.py
-├── app.py              # FastAPI application & routes
-├── config.py           # Environment-based configuration
-├── database.py         # SQLite DB setup & CRUD helpers
-├── generate_hmac.py    # CLI tool to create test HMAC digests
-├── main.py             # uvicorn entry-point
-├── models.py           # Pydantic request/response models
-├── requirements.txt    # Python dependencies
-├── security.py         # HMAC signing & verification
-├── signer_callback.py  # HTTP client for signer_service callback
-└── telegram_bot.py     # Telegram API integration
+├── app.py                  # FastAPI application & routes
+├── config.py               # Environment-based configuration
+├── database.py             # SQLite DB setup & CRUD helpers
+├── generate_hmac.py        # CLI tool to create test HMAC digests
+├── main.py                 # uvicorn entry-point
+├── models.py               # Pydantic request/response models
+├── requirements.txt        # Python dependencies
+├── security.py             # HMAC signing & verification
+├── signer_callback.py      # HTTP client for signer_service callback
+├── telegram_bot.py         # Telegram API integration
+├── telegram_handler.py     # Process Telegram callback queries
+├── telegram_poller.py      # Long-polling fallback for Telegram
+└── telegram_webhook_setup.py  # Register/delete/query Telegram webhooks
 
 signer_service/
 ├── __init__.py

@@ -14,9 +14,14 @@
 ## Quick Start
 
 ```
-Base URL: http://localhost:8002
-Auth:     X-API-Key header (value from PUBLISHER_API_KEY env var)
+Base URL (local):  http://localhost:8002
+Base URL (ngrok):  https://<your-subdomain>.ngrok-free.dev/publisher
+Auth:              X-API-Key header (agent key from the admin dashboard)
 ```
+
+> **Ngrok single-tunnel mode**: When exposed via ngrok, the frontend on
+> port 8008 proxies all `/publisher/*` requests to the publisher service.
+> Use the ngrok URL with a `/publisher` prefix as your base URL.
 
 All requests and responses are JSON. Monetary values are **smallest-unit
 strings** (e.g. 1 ETH = `"1000000000000000000"` wei, 1 SOL = `"1000000000"`
@@ -121,7 +126,7 @@ curl -s -X POST http://localhost:8002/intent \
 | 400    | Injection detected     | Prompt-injection filter triggered   |
 | 409    | Duplicate intent_id    | `"Duplicate intent_id"`             |
 | 422    | Validation error       | Invalid address, missing fields     |
-| 429    | Rate limited           | Max 20 requests / 60 s per IP       |
+| 429    | Rate limited           | Max 600 requests / 60 s per IP      |
 
 ---
 
@@ -324,8 +329,46 @@ curl -s -X POST http://localhost:8002/intent \
   are scanned for injection attempts. Malicious payloads will be rejected (400).
 - **Recipient allowlist**: If configured, only allowlisted `to_address` values
   are accepted. Default is `*` (any address).
+- **Rate limiting**: 600 requests per minute per IP. The `/health`, `/docs`,
+  and `/openapi.json` endpoints are exempt.
+- **Telegram webhook security**: When using webhook mode, Telegram callbacks
+  are verified via a secret token (`X-Telegram-Bot-Api-Secret-Token` header).
 - The agent **never** touches private keys or signing — that's all handled
   internally by the signer_service + Telegram 2FA.
+
+---
+
+## Telegram Delivery Modes
+
+The system supports **two modes** for delivering Telegram 2FA prompts:
+
+| Mode | Env var | How it works |
+| --- | --- | --- |
+| **Webhook** (recommended) | `TELEGRAM_WEBHOOK_URL` set | Telegram pushes updates instantly to your URL. Auto-registered on service startup. |
+| **Long-polling** (default) | `TELEGRAM_WEBHOOK_URL` empty | The service polls Telegram every few seconds. Works behind NATs, no public URL needed. |
+
+When running behind ngrok, set `TELEGRAM_WEBHOOK_URL=https://<subdomain>.ngrok-free.dev/telegram/webhook` and the frontend proxy will forward Telegram callbacks to the user_auth service automatically.
+
+---
+
+## Ngrok Single-Tunnel Architecture
+
+A single ngrok tunnel on the **frontend** port (8008) exposes everything:
+
+```
+ngrok http 8008
+```
+
+The frontend automatically proxies:
+
+| Public path | Internal target | Purpose |
+| --- | --- | --- |
+| `/publisher/*` | `publisher_service:8002` | Payment API (intents, wallets, agents) |
+| `/telegram/*` | `user_auth:8000` | Telegram webhook callbacks |
+| `/user-auth/*` | `user_auth:8000` | Admin/health endpoints |
+| `/*` | `frontend:8008` | Dashboard, pages, static assets |
+
+This means the agent only needs **one URL** (the ngrok URL) to reach all services.
 
 ---
 
@@ -334,7 +377,7 @@ curl -s -X POST http://localhost:8002/intent \
 ```python
 import httpx, time
 
-API = "http://localhost:8002"
+API = "http://localhost:8002"       # or ngrok: "https://<sub>.ngrok-free.dev/publisher"
 KEY = "change-me-publisher-key"
 HEADERS = {"X-API-Key": KEY}
 

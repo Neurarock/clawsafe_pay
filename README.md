@@ -45,7 +45,7 @@ prompt-injection protection.
 2. **Publisher** uses **transaction_builder** (library) to build an unsigned
    EIP-1559 `DraftTx` with a signing digest.
 3. **Publisher** optionally sends the `DraftTx` to **reviewer_service**
-   (not yet implemented — defaults to `WARN`).
+   for AI safety analysis (verdict: `OK`, `WARN`, or `BLOCK`).
 4. **Publisher** submits the tx details to **signer_service** (`POST /sign`).
 5. **Signer** requests Telegram approval from **user_auth** (`POST /auth/request`).
 6. **User_auth** sends an inline-keyboard prompt to Telegram and polls for the
@@ -107,6 +107,50 @@ becomes the **admin key** used to manage agents via the dashboard.
 
 > See [docs/api_user_management.md](docs/api_user_management.md) for full API
 > reference, dashboard guide, and schema details.
+
+### Telegram Delivery Modes
+
+The `user_auth` service supports two modes for receiving Telegram callback
+updates:
+
+| Mode | Config | Behaviour |
+| --- | --- | --- |
+| **Webhook** (recommended) | `TELEGRAM_WEBHOOK_URL` set in `.env` | Webhook registered automatically on startup. Telegram pushes updates instantly. |
+| **Long-polling** (default) | `TELEGRAM_WEBHOOK_URL` empty/unset | Service polls Telegram every few seconds. Works behind NATs. |
+
+Admin endpoints for webhook management:
+
+| Method | Path | Description |
+| --- | --- | --- |
+| `POST` | `/admin/webhook/register` | Manually register the webhook |
+| `DELETE` | `/admin/webhook` | Delete the current webhook |
+| `GET` | `/admin/webhook/info` | Show current webhook status |
+
+When webhook mode is active, Telegram callbacks are verified via the
+`X-Telegram-Bot-Api-Secret-Token` header using the configured
+`TELEGRAM_WEBHOOK_SECRET`.
+
+### Ngrok Single-Tunnel Proxy
+
+For external access (e.g. from a remote OpenClaw agent), expose the
+**frontend** port via a single ngrok tunnel:
+
+```bash
+ngrok http 8008
+```
+
+The frontend automatically proxies requests to internal services:
+
+| Public path | Internal target | Purpose |
+| --- | --- | --- |
+| `/publisher/*` | `publisher_service:8002` | Payment API |
+| `/telegram/*` | `user_auth:8000` | Telegram webhook callbacks |
+| `/user-auth/*` | `user_auth:8000` | Admin & health endpoints |
+| `/*` | `frontend:8008` | Dashboard, pages, static assets |
+
+Set `TELEGRAM_WEBHOOK_URL=https://<subdomain>.ngrok-free.dev/telegram/webhook`
+in `.env` so the user_auth service auto-registers the webhook through the
+frontend proxy on startup.
 
 ### Reviewer Service
 
@@ -213,6 +257,10 @@ POLICY_RECIPIENT_ALLOWLIST=*         # comma-separated addresses, or * for any
 # FLOCK_API_KEY=<your-flock-key>
 # INJECTION_WARN_THRESHOLD=5            # 0-10 score, warn above this
 # INJECTION_BLOCK_THRESHOLD=8           # 0-10 score, block above this
+
+# ── TELEGRAM WEBHOOK (optional — enables instant delivery) ───────
+# TELEGRAM_WEBHOOK_URL=https://<subdomain>.ngrok-free.dev/telegram/webhook
+# TELEGRAM_WEBHOOK_SECRET=<random-secret>   # verifies Telegram callbacks
 ```
 
 ### 4. Start Services (four terminals)
@@ -240,9 +288,21 @@ python -m frontend.main
 docker compose up --build
 ```
 
-### 5. Delete Telegram Webhook (for local development)
+### 5. Telegram Delivery
 
-If you previously set a webhook, delete it so the long-polling bot works:
+**Option A — Webhook mode (recommended for production / ngrok)**:
+
+Set `TELEGRAM_WEBHOOK_URL` in `.env` and the webhook is auto-registered on
+startup. No manual curl required.
+
+```bash
+# .env
+TELEGRAM_WEBHOOK_URL=https://<subdomain>.ngrok-free.dev/telegram/webhook
+```
+
+**Option B — Long-polling (default, no public URL needed)**:
+
+Leave `TELEGRAM_WEBHOOK_URL` empty. Delete any stale webhook if needed:
 
 ```bash
 curl -s -X POST "https://api.telegram.org/bot<TELEGRAM_BOT_TOKEN>/deleteWebhook"
@@ -354,6 +414,7 @@ clawsafe_pay/
 │   │   ├── telegram_bot.py       #   Send/edit Telegram messages
 │   │   ├── telegram_handler.py   #   Process callback queries
 │   │   ├── telegram_poller.py    #   Long-polling fallback
+│   │   ├── telegram_webhook_setup.py  #   Webhook register/delete/info
 │   │   ├── Dockerfile
 │   │   └── requirements.txt
 │   │
@@ -484,7 +545,8 @@ and continues the workflow. A `BLOCK` verdict halts the pipeline immediately.
   **Only agent keys may submit transactions** (`POST /intent`).
 - **Per-agent Telegram routing** — each agent can have its own Telegram chat
   ID for approval prompts, isolated from other agents.
-- **Rate limiting** is applied per-IP on all services (20–30 req/min).
+- **Rate limiting** is applied per-IP on publisher_service (600 req/min;
+  `/health`, `/docs`, `/openapi.json` exempt).
 - **Prompt-injection filter** (optional, via Flock API) scores user-controlled
   fields before processing. Score ≥ `INJECTION_BLOCK_THRESHOLD` (default 8)
   → request rejected; score ≥ `INJECTION_WARN_THRESHOLD` (default 5) → logged.
