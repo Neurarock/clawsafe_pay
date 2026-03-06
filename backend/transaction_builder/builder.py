@@ -61,13 +61,14 @@ def _compute_digest(
     gas_limit: int,
     to: str,
     value_wei: int,
+    data: bytes = b"",
 ) -> str:
     """
-    Compute the EIP-1559 signing hash for an unsigned native-transfer transaction.
+    Compute the EIP-1559 signing hash for an unsigned transaction.
 
     Hash = keccak256(0x02 || rlp([
         chain_id, nonce, max_priority_fee_per_gas, max_fee_per_gas,
-        gas_limit, to, value, data=b"", access_list=[]
+        gas_limit, to, value, data, access_list=[]
     ]))
 
     Returns a 0x-prefixed 32-byte hex string.
@@ -96,7 +97,7 @@ def _compute_digest(
         "gas": gas_limit,
         "to": to_checksummed,
         "value": value_wei,
-        "data": b"",
+        "data": data,
         "accessList": [],
     }
     typed_tx = TypedTransaction.from_dict(tx_dict)
@@ -163,15 +164,25 @@ async def build_draft_tx(
 
     value_wei = int(intent.amount_wei)
 
+    # ── Step 3.5: Resolve calldata and gas limit ──────────────────────────────
+    calldata_hex = getattr(intent, "calldata", "0x") or "0x"
+    if calldata_hex and calldata_hex != "0x":
+        calldata_bytes = bytes.fromhex(calldata_hex.lstrip("0x"))
+        gas_limit = policy.gas_limit_contract_call
+    else:
+        calldata_bytes = b""
+        gas_limit = policy.gas_limit_native_transfer
+
     # ── Step 4: Compute signing digest ───────────────────────────────────────
     digest = _compute_digest(
         chain_id=SEPOLIA_CHAIN_ID,
         nonce=nonce,
         max_priority_fee_per_gas=tip,
         max_fee_per_gas=max_fee,
-        gas_limit=_GAS_LIMIT_NATIVE,
+        gas_limit=gas_limit,
         to=intent.to_address,
         value_wei=value_wei,
+        data=calldata_bytes,
     )
 
     draft = DraftTx(
@@ -180,8 +191,9 @@ async def build_draft_tx(
         from_address=from_address.lower(),
         to=intent.to_address,
         value_wei=str(value_wei),
+        data=calldata_hex,
         nonce=nonce,
-        gas_limit=_GAS_LIMIT_NATIVE,
+        gas_limit=gas_limit,
         max_fee_per_gas=str(max_fee),
         max_priority_fee_per_gas=str(tip),
         digest=digest,

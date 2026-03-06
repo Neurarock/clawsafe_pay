@@ -131,9 +131,14 @@ class TestValidateDraftTx:
 
     # ── Calldata ──────────────────────────────────────────────────────────────
 
-    def test_non_empty_calldata_raises(self):
-        draft = make_draft(data="0xdeadbeef")
-        with pytest.raises(PolicyError, match="calldata must be empty"):
+    def test_non_empty_calldata_passes_with_contract_call_gas(self):
+        # Non-empty calldata is now allowed — gas limit switches to gas_limit_contract_call
+        draft = make_draft(data="0xdeadbeef", gas_limit=300_000)
+        validate_draft_tx(draft, make_policy(), BASE_FEE_10_GWEI)
+
+    def test_non_empty_calldata_exceeding_contract_gas_cap_raises(self):
+        draft = make_draft(data="0xdeadbeef", gas_limit=300_001)
+        with pytest.raises(PolicyError, match="gas_limit"):
             validate_draft_tx(draft, make_policy(), BASE_FEE_10_GWEI)
 
     def test_empty_string_data_passes(self):
@@ -147,6 +152,7 @@ class TestValidateDraftTx:
     # ── Gas limit ─────────────────────────────────────────────────────────────
 
     def test_gas_above_native_limit_raises(self):
+        # No calldata → cap is gas_limit_native_transfer (21,000)
         draft = make_draft(gas_limit=100_000)
         with pytest.raises(PolicyError, match="gas_limit"):
             validate_draft_tx(draft, make_policy(), BASE_FEE_10_GWEI)

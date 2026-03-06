@@ -11,6 +11,7 @@ class ReviewRequest(BaseModel):
     intent_id: str
     draft_tx: dict
     current_base_fee_wei: int
+    calldata_description: str = ""
 
 
 class GasAssessment(BaseModel):

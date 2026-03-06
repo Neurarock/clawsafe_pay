@@ -38,13 +38,13 @@ Transaction details:
   Max priority fee/gas:   {max_priority_fee_per_gas} wei ({priority_gwei:.4f} gwei)
   Current network base fee: {base_fee_wei} wei ({base_fee_gwei:.4f} gwei)
   Estimated total fee:    {estimated_fee_wei} wei ({estimated_fee_eth:.8f} ETH)
-
+{calldata_section}
 Check for:
 1. Gas fee manipulation — is max_fee_per_gas unreasonably high vs the base fee?
    (> 3x base fee = WARN, > 10x base fee = BLOCK)
 2. Unusual or suspicious transfer amount.
 3. Any other transaction anomalies.
-
+{calldata_checks}
 Return ONLY this JSON structure (no markdown):
 {{
   "verdict": "OK",
@@ -60,8 +60,24 @@ Return ONLY this JSON structure (no markdown):
 Verdict must be exactly one of: "OK", "WARN", or "BLOCK".
 """
 
+_CALLDATA_SECTION_TEMPLATE = """\
+  Calldata (hex):         {calldata}
+  Agent's description:    {calldata_description}
 
-def _build_prompt(draft_tx: dict, current_base_fee_wei: int) -> str:
+"""
+
+_CALLDATA_CHECKS = """\
+4. Calldata analysis — independently decode the calldata hex for the contract at the "To" address:
+   a. Identify the function selector (first 4 bytes) and what function it calls.
+   b. Decode the key parameters (token addresses, amounts, recipients, deadlines).
+   c. Verify the agent's description matches what the calldata actually does.
+   d. Flag any discrepancy between the agent's description and the decoded calldata as WARN.
+   e. Flag if calldata sends funds to an address not matching the stated recipient as BLOCK.
+   Include your calldata interpretation in the "summary" field.
+"""
+
+
+def _build_prompt(draft_tx: dict, current_base_fee_wei: int, calldata_description: str = "") -> str:
     value_wei = int(draft_tx.get("value_wei", 0))
     gas_limit = int(draft_tx.get("gas_limit", 21_000))
     max_fee = int(draft_tx.get("max_fee_per_gas", 0))
@@ -69,6 +85,17 @@ def _build_prompt(draft_tx: dict, current_base_fee_wei: int) -> str:
     chain_id = draft_tx.get("chain_id", 11155111)
     chain_name = "Sepolia testnet" if chain_id == 11155111 else f"chain {chain_id}"
     estimated_fee_wei = gas_limit * max_fee
+
+    calldata = draft_tx.get("data", "0x") or "0x"
+    has_calldata = calldata not in ("0x", "")
+    calldata_section = (
+        _CALLDATA_SECTION_TEMPLATE.format(
+            calldata=calldata,
+            calldata_description=calldata_description or "(no description provided)",
+        )
+        if has_calldata else ""
+    )
+    calldata_checks = _CALLDATA_CHECKS if has_calldata else ""
 
     return _USER_PROMPT_TEMPLATE.format(
         intent_id=draft_tx.get("intent_id", "unknown"),
@@ -87,6 +114,8 @@ def _build_prompt(draft_tx: dict, current_base_fee_wei: int) -> str:
         base_fee_gwei=current_base_fee_wei / 1e9,
         estimated_fee_wei=estimated_fee_wei,
         estimated_fee_eth=estimated_fee_wei / 1e18,
+        calldata_section=calldata_section,
+        calldata_checks=calldata_checks,
     )
 
 
@@ -156,6 +185,14 @@ def _heuristic_review(draft_tx: dict, current_base_fee_wei: int) -> dict:
     reasons = []
     verdict = "OK"
 
+    # Non-empty calldata cannot be verified without the LLM — always flag WARN
+    calldata = draft_tx.get("data", "0x") or "0x"
+    if calldata not in ("0x", ""):
+        verdict = "WARN"
+        reasons.append(
+            "LLM unavailable: transaction contains calldata that could not be independently verified"
+        )
+
     if current_base_fee_wei > 0:
         ratio = max_fee / current_base_fee_wei
         if ratio > 10:
@@ -163,7 +200,7 @@ def _heuristic_review(draft_tx: dict, current_base_fee_wei: int) -> dict:
             reasons.append(
                 f"Gas fee manipulation: max_fee_per_gas is {ratio:.1f}x the current base fee"
             )
-        elif ratio > 3:
+        elif ratio > 3 and verdict != "BLOCK":
             verdict = "WARN"
             reasons.append(
                 f"Elevated gas fee: max_fee_per_gas is {ratio:.1f}x the current base fee"
@@ -185,6 +222,7 @@ async def review_transaction(
     intent_id: str,
     draft_tx: dict,
     current_base_fee_wei: int,
+    calldata_description: str = "",
 ) -> dict:
     """
     Call Z.AI GLM-5 to review the transaction. Returns a dict with the
@@ -193,7 +231,7 @@ async def review_transaction(
     Logs the model name and request_id for hackathon proof.
     """
     model = config.ZAI_MODEL
-    prompt = _build_prompt(draft_tx, current_base_fee_wei)
+    prompt = _build_prompt(draft_tx, current_base_fee_wei, calldata_description)
 
     logger.info(
         "Sending review request to Z.AI: intent_id=%s model=%s endpoint=%s/chat/completions",

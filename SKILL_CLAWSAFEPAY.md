@@ -78,6 +78,8 @@ POST /intent
 | `chain`        | string | no       | Target chain (default `"sepolia"`)                 |
 | `asset`        | string | no       | Asset to transfer (default `"ETH"`)                |
 | `note`         | string | no       | Human-readable memo (default `""`)                 |
+| `calldata`     | string | no       | Hex-encoded calldata for contract interactions (default `"0x"` = simple transfer) |
+| `calldata_description` | string | no | Plain-English description of what the calldata does — used by the reviewer to independently verify the operation |
 
 > **`from_address`**: Pass a wallet address returned by `GET /wallets` to
 > select which wallet signs and pays for the transaction. If omitted or empty,
@@ -277,6 +279,40 @@ violation error.
 | ------ | ------- | ---- | ------ | --------------- |
 | USDC   | ✅      | ✅   | ✅     | ERC-20 / SPL    |
 | USDT   | ✅      | ✅   | ✅     | ERC-20 / SPL    |
+
+---
+
+## Contract Interactions (DeFi, Swaps, Staking)
+
+To interact with a smart contract — such as swapping tokens on Uniswap, staking, or calling any on-chain function — populate the `calldata` and `calldata_description` fields.
+
+**How it works:**
+1. Your agent builds the ABI-encoded calldata (using ethers.js, web3.py, etc.)
+2. Submit the intent with `to_address` = the contract address, `value_wei` = ETH sent with the call (if any), and `calldata` = the encoded function call
+3. The reviewer independently decodes your calldata and compares it against your `calldata_description`
+4. The human approving on Telegram sees **both** your description **and** the reviewer's independent interpretation — mismatches are flagged
+
+**Example: Uniswap V3 swap (0.01 ETH → WBTC on Sepolia)**
+
+```bash
+curl -s -X POST http://localhost:8002/intent \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: change-me-publisher-key" \
+  -d '{
+    "intent_id": "swap-001",
+    "from_user": "alice",
+    "to_user": "uniswap",
+    "amount_wei": "10000000000000000",
+    "to_address": "0x3bFA4769FB09eefC5a80d6E87c3B9C650f7Ae48",
+    "calldata": "0x414bf389...",
+    "calldata_description": "exactInputSingle: swap 0.01 ETH for WBTC, recipient=0xMywallet, slippage 0.5%",
+    "note": "DCA buy: weekly WBTC accumulation"
+  }'
+```
+
+> **Simple transfers**: Leave `calldata` unset (defaults to `"0x"`). The system behaves exactly as before — no changes needed for existing simple payment flows.
+
+> **Gas**: Contract calls use a default gas limit of 300,000. If your operation requires more, contact the platform administrator to adjust the policy.
 
 ---
 

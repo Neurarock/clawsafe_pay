@@ -35,6 +35,7 @@ class DownstreamError(Exception):
 async def call_reviewer(
     draft_tx: DraftTx,
     current_base_fee_wei: int,
+    calldata_description: str = "",
 ) -> ReviewReport:
     """POST /review to reviewer_service. Returns a ReviewReport."""
     url = f"{config.REVIEWER_SERVICE_URL}/review"
@@ -42,6 +43,7 @@ async def call_reviewer(
         "intent_id": draft_tx.intent_id,
         "draft_tx": draft_tx.model_dump(mode="json"),
         "current_base_fee_wei": current_base_fee_wei,
+        "calldata_description": calldata_description,
     }
     async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
         try:

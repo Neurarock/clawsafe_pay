@@ -65,6 +65,8 @@ async def run_intent_workflow(intent_id: str) -> None:
         note=row["note"],
         chain=row.get("chain", "sepolia"),
         asset=row.get("asset", "ETH"),
+        calldata=row.get("calldata", "0x") or "0x",
+        calldata_description=row.get("calldata_description", "") or "",
     )
 
     # ── Resolve chain config ─────────────────────────────────────────────────
@@ -106,7 +108,11 @@ async def run_intent_workflow(intent_id: str) -> None:
     try:
         # Pass the current base fee from the draft's max fee estimate (best proxy without re-fetching)
         current_base_fee_wei = int(draft.max_fee_per_gas) - int(draft.max_priority_fee_per_gas)
-        review = await call_reviewer(draft, max(current_base_fee_wei, 0))
+        review = await call_reviewer(
+            draft,
+            max(current_base_fee_wei, 0),
+            calldata_description=intent.calldata_description,
+        )
     except DownstreamError as exc:
         # Reviewer unreachable — default to WARN as per spec
         logger.warning(

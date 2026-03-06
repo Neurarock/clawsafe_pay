@@ -57,6 +57,8 @@ _MIGRATE_RISK_REASONS = "ALTER TABLE payment_intents ADD COLUMN risk_reasons_jso
 _MIGRATE_TRUST_LEVEL = "ALTER TABLE payment_intents ADD COLUMN trust_level TEXT NOT NULL DEFAULT 'new';"
 _MIGRATE_POLICY_DECISION = "ALTER TABLE payment_intents ADD COLUMN policy_decision TEXT NOT NULL DEFAULT 'needs_review';"
 _MIGRATE_REQUIRES_HUMAN = "ALTER TABLE payment_intents ADD COLUMN requires_human INTEGER NOT NULL DEFAULT 1;"
+_MIGRATE_CALLDATA = "ALTER TABLE payment_intents ADD COLUMN calldata TEXT NOT NULL DEFAULT '0x';"
+_MIGRATE_CALLDATA_DESC = "ALTER TABLE payment_intents ADD COLUMN calldata_description TEXT NOT NULL DEFAULT '';"
 
 VALID_STATUSES = {
     "pending", "building", "reviewing", "awaiting_approval",
@@ -91,6 +93,8 @@ def init_db() -> None:
             _MIGRATE_TRUST_LEVEL,
             _MIGRATE_POLICY_DECISION,
             _MIGRATE_REQUIRES_HUMAN,
+            _MIGRATE_CALLDATA,
+            _MIGRATE_CALLDATA_DESC,
         ):
             try:
                 conn.execute(stmt)
@@ -126,7 +130,10 @@ def _is_prepopulated_demo_row(row: dict) -> bool:
     return note in demo_notes or intent_id.startswith("dash-")
 
 
-def _infer_tx_type(note: str) -> str:
+def _infer_tx_type(note: str, calldata: str = "0x") -> str:
+    if calldata and calldata not in ("0x", ""):
+        # Non-empty calldata always means a contract interaction — refine below
+        pass
     n = (note or "").lower()
     if any(k in n for k in ("swap", "dex", "uniswap", "sushiswap", "curve")):
         return "swap"
@@ -143,6 +150,8 @@ def _infer_tx_type(note: str) -> str:
     if "nft" in n and any(k in n for k in ("sell", "list")):
         return "nft_sell"
     if any(k in n for k in ("contract", "call", "execute")):
+        return "contract_call"
+    if calldata and calldata not in ("0x", ""):
         return "contract_call"
     return "transfer"
 
@@ -206,7 +215,7 @@ def _build_tx_metadata(row: dict, *, seen_before: bool) -> dict:
             "requires_human": 0,
         }
 
-    tx_type = _infer_tx_type(row.get("note", ""))
+    tx_type = _infer_tx_type(row.get("note", ""), row.get("calldata", "0x"))
     trust_level = _derive_trust_level(
         to_address=row.get("to_address", ""),
         status=row.get("status", ""),
@@ -285,6 +294,8 @@ def insert_intent(
     asset: str = "ETH",
     from_address: str = "",
     api_user_id: str = "",
+    calldata: str = "0x",
+    calldata_description: str = "",
 ) -> dict:
     now = datetime.now(timezone.utc).isoformat()
     with _get_connection() as conn:
@@ -300,6 +311,7 @@ def insert_intent(
                 "to_address": to_address,
                 "amount_wei": amount_wei,
                 "status": "pending",
+                "calldata": calldata,
             },
             seen_before=seen_before,
         )
@@ -308,13 +320,14 @@ def insert_intent(
             INSERT INTO payment_intents
               (intent_id, from_user, to_user, to_address, from_address, amount_wei, chain, asset, note,
                api_user_id, created_at, updated_at, tx_type, tx_purpose, risk_level, risk_reasons_json,
-               trust_level, policy_decision, requires_human)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+               trust_level, policy_decision, requires_human, calldata, calldata_description)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 intent_id, from_user, to_user, to_address, from_address, amount_wei, chain, asset, note,
                 api_user_id, now, now, meta["tx_type"], meta["tx_purpose"], meta["risk_level"],
                 meta["risk_reasons_json"], meta["trust_level"], meta["policy_decision"], meta["requires_human"],
+                calldata, calldata_description,
             ),
         )
     return get_intent(intent_id)

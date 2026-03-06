@@ -202,6 +202,56 @@ async def test_none_policy_uses_safe_defaults():
         await build_draft_tx(intent, MockProvider(), FROM_ADDRESS, policy=None)
 
 
+# ── Calldata ──────────────────────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_calldata_present_in_draft_data_field():
+    """Calldata from intent is carried through to draft.data unchanged."""
+    policy = PolicyConfig(recipient_allowlist=[VALID_RECIPIENT], gas_limit_contract_call=300_000)
+    intent = make_intent(calldata="0xdeadbeef")
+    draft = await build_draft_tx(intent, MockProvider(), FROM_ADDRESS, policy)
+    assert draft.data == "0xdeadbeef"
+
+
+@pytest.mark.asyncio
+async def test_calldata_selects_contract_call_gas_limit():
+    """Non-empty calldata must switch gas limit to gas_limit_contract_call."""
+    policy = PolicyConfig(recipient_allowlist=[VALID_RECIPIENT], gas_limit_contract_call=300_000)
+    intent = make_intent(calldata="0xdeadbeef")
+    draft = await build_draft_tx(intent, MockProvider(), FROM_ADDRESS, policy)
+    assert draft.gas_limit == 300_000
+
+
+@pytest.mark.asyncio
+async def test_no_calldata_keeps_native_gas_limit():
+    """Empty calldata keeps 21,000 gas limit."""
+    draft = await build_draft_tx(make_intent(), MockProvider(), FROM_ADDRESS, default_policy())
+    assert draft.gas_limit == 21_000
+
+
+@pytest.mark.asyncio
+async def test_digest_changes_when_calldata_changes():
+    """Different calldata must produce a different digest (calldata is part of the signing hash)."""
+    policy = PolicyConfig(recipient_allowlist=[VALID_RECIPIENT], gas_limit_contract_call=300_000)
+    p1 = MockProvider(nonce=1)
+    p2 = MockProvider(nonce=1)
+    d1 = await build_draft_tx(make_intent(calldata="0xdeadbeef"), p1, FROM_ADDRESS, policy)
+    d2 = await build_draft_tx(make_intent(calldata="0xcafebabe"), p2, FROM_ADDRESS, policy)
+    assert d1.digest != d2.digest
+
+
+@pytest.mark.asyncio
+async def test_digest_changes_between_calldata_and_no_calldata():
+    """A tx with calldata must have a different digest than the same tx without calldata."""
+    policy = PolicyConfig(recipient_allowlist=[VALID_RECIPIENT], gas_limit_contract_call=300_000)
+    p1 = MockProvider(nonce=1)
+    p2 = MockProvider(nonce=1)
+    with_data = await build_draft_tx(make_intent(calldata="0xdeadbeef"), p1, FROM_ADDRESS, policy)
+    without_data = await build_draft_tx(make_intent(), p2, FROM_ADDRESS, default_policy())
+    assert with_data.digest != without_data.digest
+
+
 # ── Provider errors ───────────────────────────────────────────────────────────
 
 
