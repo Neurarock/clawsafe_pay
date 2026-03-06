@@ -10,6 +10,10 @@ from pydantic import BaseModel, Field
 class CreateApiUser(BaseModel):
     """Request body for creating a new API user (agent)."""
     name: str = Field(..., min_length=1, max_length=100, description="Display name for the agent")
+    telegram_chat_id: str = Field(
+        default="",
+        description="Telegram chat ID for auth notifications. If empty, uses the global default.",
+    )
     allowed_assets: list[str] = Field(
         default=["*"],
         description='Token symbols this agent can transact (e.g. ["ETH","USDC"]). ["*"] = all.',
@@ -36,6 +40,7 @@ class CreateApiUser(BaseModel):
 class UpdateApiUser(BaseModel):
     """Request body for updating an API user. All fields optional."""
     name: Optional[str] = Field(None, min_length=1, max_length=100)
+    telegram_chat_id: Optional[str] = None
     allowed_assets: Optional[list[str]] = None
     allowed_chains: Optional[list[str]] = None
     max_amount_wei: Optional[str] = None
@@ -49,6 +54,10 @@ class ApiUserResponse(BaseModel):
     id: str
     name: str
     api_key_prefix: str
+    telegram_chat_id_set: bool = Field(
+        default=False,
+        description="Whether a Telegram chat ID has been configured (the actual ID is hidden).",
+    )
     allowed_assets: list[str]
     allowed_chains: list[str]
     max_amount_wei: str

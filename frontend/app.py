@@ -57,6 +57,7 @@ async def frontend_config():
     js = (
         f'window.__CLAWSAFE_API = "{config.PUBLISHER_BROWSER_URL}";\n'
         f'window.__CLAWSAFE_API_KEY = "{config.PUBLISHER_API_KEY}";\n'
+        f'window.__CLAWSAFE_DEFAULT_AGENT_KEY = "{config.DEFAULT_PUBLISHER_API}";\n'
     )
     return Response(content=js, media_type="application/javascript")
 

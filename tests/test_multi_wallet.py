@@ -235,6 +235,7 @@ class TestPublisherWalletsAPI:
         monkeypatch.setattr(config, "SIGNER_POLL_INTERVAL_SECONDS", 0.01)
         monkeypatch.setattr(config, "SIGNER_POLL_TIMEOUT_SECONDS", 0.1)
         monkeypatch.setattr(config, "FLOCK_API_KEY", "")
+        monkeypatch.setattr(config, "DEFAULT_PUBLISHER_API", "")
         yield
 
     @pytest.fixture
@@ -250,6 +251,15 @@ class TestPublisherWalletsAPI:
         with TestClient(app_module.app) as c:
             yield c
 
+    def _make_agent_key(self, client):
+        resp = client.post(
+            "/api-users",
+            json={"name": "mw-agent", "allowed_assets": ["*"], "allowed_chains": ["*"]},
+            headers={"X-API-Key": "test-key"},
+        )
+        assert resp.status_code == 201
+        return resp.json()["api_key"]
+
     def test_wallets_endpoint_returns_list(self, client):
         resp = client.get("/wallets")
         assert resp.status_code == 200
@@ -260,6 +270,7 @@ class TestPublisherWalletsAPI:
         assert len(data["wallets"]) >= 1
 
     def test_submit_intent_with_from_address(self, client):
+        agent_key = self._make_agent_key(client)
         resp = client.post("/intent", json={
             "intent_id": "mw-api-1",
             "from_user": "alice",
@@ -268,10 +279,11 @@ class TestPublisherWalletsAPI:
             "to_address": "0xd8da6bf26964af9d7eed9e03e53415d37aa96045",
             "from_address": WALLET_2,
             "note": "multi-wallet test",
-        }, headers={"X-API-Key": "test-key"})
+        }, headers={"X-API-Key": agent_key})
         assert resp.status_code == 202
 
     def test_get_intent_includes_from_address(self, client):
+        agent_key = self._make_agent_key(client)
         client.post("/intent", json={
             "intent_id": "mw-api-2",
             "from_user": "alice",
@@ -280,7 +292,7 @@ class TestPublisherWalletsAPI:
             "to_address": "0xd8da6bf26964af9d7eed9e03e53415d37aa96045",
             "from_address": WALLET_2,
             "note": "test",
-        }, headers={"X-API-Key": "test-key"})
+        }, headers={"X-API-Key": agent_key})
 
         resp = client.get("/intent/mw-api-2", headers={"X-API-Key": "test-key"})
         assert resp.status_code == 200
@@ -288,6 +300,7 @@ class TestPublisherWalletsAPI:
         assert data["from_address"] == WALLET_2
 
     def test_list_intents_includes_from_address(self, client):
+        agent_key = self._make_agent_key(client)
         client.post("/intent", json={
             "intent_id": "mw-api-3",
             "from_user": "alice",
@@ -296,7 +309,7 @@ class TestPublisherWalletsAPI:
             "to_address": "0xd8da6bf26964af9d7eed9e03e53415d37aa96045",
             "from_address": WALLET_1,
             "note": "test",
-        }, headers={"X-API-Key": "test-key"})
+        }, headers={"X-API-Key": agent_key})
 
         resp = client.get("/intents", headers={"X-API-Key": "test-key"})
         assert resp.status_code == 200

@@ -52,7 +52,7 @@
 
   <!-- ═══ Admin Banner ═══ -->
   <div class="admin-banner">
-    🛡️ <span>You are <strong>Admin</strong>. Transactions from this dashboard use the admin key and bypass agent limits. Agents use their own keys via API.</span>
+    🛡️ <span>You are <strong>Admin</strong>. Admin privileges apply to agent management, wallet management, and monitoring. <strong>Transactions require an agent API key</strong> — enter your key in the transaction form.</span>
   </div>
 
   <!-- ═══ Stats Row ═══ -->
@@ -82,6 +82,15 @@
         <div class="wb pad">
           <form id="txForm" autocomplete="off">
             <div class="form-stack">
+              <div class="form-group">
+                <label>🔑 Agent API Key <span style="color:var(--red)">*</span></label>
+                <div style="position:relative">
+                  <input type="password" id="tx-api-key" placeholder="Enter your agent API key" required style="padding-right:36px">
+                  <button type="button" class="w-btn" onclick="toggleTxKeyVisibility()" title="Show/Hide"
+                    style="position:absolute;right:4px;top:50%;transform:translateY(-50%);font-size:12px" id="tx-key-eye">👁</button>
+                </div>
+                <div class="form-hint" style="color:var(--amber)">⚠️ Required — no transactions without a valid agent key</div>
+              </div>
               <div class="form-row">
                 <div class="form-group">
                   <label>Chain</label>
@@ -145,9 +154,27 @@
         <div class="wb pad">
           <form id="agentForm" autocomplete="off">
             <div class="form-stack">
+              <!-- Beta Notice -->
+              <div style="background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.25);border-radius:8px;padding:10px 12px;margin-bottom:4px;font-size:11px;line-height:1.6;color:var(--muted)">
+                <strong style="color:var(--amber)">⚠️ BETA NOTICE</strong><br>
+                Only <strong style="color:var(--text)">Sepolia testnet</strong> wallets are available in this beta. The two default wallets are <strong style="color:var(--text)">shared between all users</strong> — be mindful of balance when testing. Do not send more than the wallet holds.<br>
+                <span style="color:var(--cyan)">Check wallet balances below before submitting transactions.</span>
+              </div>
               <div class="form-group">
                 <label>Agent Name</label>
                 <input type="text" id="ag-name" placeholder="e.g. OpenClaw Agent" required>
+              </div>
+              <div class="form-group">
+                <label>📱 Telegram Chat ID</label>
+                <div style="position:relative">
+                  <input type="text" id="ag-telegram-chat-id" placeholder="e.g. 6807358958 or -5239918904">
+                </div>
+                <div class="form-hint" style="color:var(--muted);line-height:1.6">
+                  <strong>How to get your Telegram Chat ID:</strong><br>
+                  • <strong>Personal ID:</strong> Message <a href="https://t.me/userinfobot" target="_blank" rel="noopener" style="color:var(--cyan)">@userinfobot</a> on Telegram — it replies with your user ID (e.g. <code style="color:var(--cyan);background:rgba(6,182,212,.06);padding:1px 4px;border-radius:3px;font-size:10px">6807358958</code>).<br>
+                  • <strong>Group Chat ID:</strong> Add <a href="https://t.me/userinfobot" target="_blank" rel="noopener" style="color:var(--cyan)">@userinfobot</a> to your group — it posts the group chat ID (starts with <code style="color:var(--cyan);background:rgba(6,182,212,.06);padding:1px 4px;border-radius:3px;font-size:10px">-</code>).<br>
+                  • Leave empty to use the default system chat for auth prompts.
+                </div>
               </div>
               <div class="form-group">
                 <label>Allowed Assets</label>
@@ -289,12 +316,13 @@
         </div>
         <div class="wb pad">
           <div style="font-size:11px;color:var(--muted);line-height:1.7">
-            <p><strong style="color:var(--text)">1.</strong> Submit transactions via the form — uses admin key.</p>
-            <p><strong style="color:var(--text)">2.</strong> Create agents with scoped permissions &amp; API keys.</p>
-            <p><strong style="color:var(--text)">3.</strong> Agent keys are shown <span style="color:var(--amber)">only once</span> — copy immediately.</p>
-            <p><strong style="color:var(--text)">4.</strong> Agents call the API with their key as <code style="color:var(--cyan);background:rgba(6,182,212,.06);padding:1px 4px;border-radius:3px;font-size:10px">X-API-Key</code>.</p>
+            <p><strong style="color:var(--text)">1.</strong> Create an agent with an API key — <span style="color:var(--amber)">needed for ALL transactions</span>.</p>
+            <p><strong style="color:var(--text)">2.</strong> Optionally set a Telegram Chat ID per agent for auth notifications.</p>
+            <p><strong style="color:var(--text)">3.</strong> Submit transactions by entering your agent API key in the form.</p>
+            <p><strong style="color:var(--text)">4.</strong> Agent keys are shown <span style="color:var(--amber)">only once</span> — copy immediately.</p>
             <p><strong style="color:var(--text)">5.</strong> Permissions enforce tokens, chains, and spending limits.</p>
             <p><strong style="color:var(--text)">6.</strong> Daily limits reset at midnight UTC.</p>
+            <p style="color:var(--amber);margin-top:6px"><strong>⚠️ Beta:</strong> Only Sepolia testnet. Shared wallets — check balances first!</p>
           </div>
         </div>
       </div>
@@ -550,6 +578,11 @@
       <input type="hidden" id="ed-id">
       <div class="form-stack">
         <div class="form-group"><label>Agent Name</label><input type="text" id="ed-name" required></div>
+        <div class="form-group">
+          <label>📱 Telegram Chat ID</label>
+          <input type="text" id="ed-telegram-chat-id" placeholder="Leave empty for default">
+          <div class="form-hint" style="color:var(--muted)">Set a per-agent Telegram chat ID, or leave empty for global default. Current value is hidden for security — enter new value to update.</div>
+        </div>
         <div class="form-group"><label>Allowed Assets (comma-separated or *)</label><input type="text" id="ed-assets" placeholder="ETH,USDC or *"></div>
         <div class="form-group"><label>Allowed Chains (comma-separated or *)</label><input type="text" id="ed-chains" placeholder="sepolia,base or *"></div>
         <div class="form-row">

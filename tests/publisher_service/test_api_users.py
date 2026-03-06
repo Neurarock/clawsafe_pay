@@ -346,14 +346,15 @@ class TestAgentAuth:
         )
         assert resp.status_code == 401
 
-    def test_admin_key_still_works(self, client):
-        """Admin key should bypass all agent permission checks."""
+    def test_admin_key_cannot_submit_intent(self, client):
+        """Admin key alone should NOT be able to submit transactions — agent key required."""
         resp = client.post(
             "/intent",
             json={**VALID_INTENT, "intent_id": "admin-direct"},
             headers=ADMIN_HEADERS,
         )
-        assert resp.status_code == 202
+        assert resp.status_code == 403
+        assert "agent API key" in resp.json()["detail"].lower() or "agent" in resp.json()["detail"].lower()
 
     def test_agent_cannot_access_management(self, client):
         """Agent keys should not be able to list/create other agents."""

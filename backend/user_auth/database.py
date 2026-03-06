@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS auth_requests (
     action       TEXT NOT NULL,                           -- human-readable description of the action
     status       TEXT NOT NULL DEFAULT 'pending',         -- pending | approved | rejected | expired
     hmac_digest  TEXT NOT NULL,                           -- HMAC-SHA256 digest for request integrity
+    telegram_chat_id TEXT NOT NULL DEFAULT '',            -- per-agent chat ID override
     created_at   TEXT NOT NULL,                           -- ISO-8601 UTC
     resolved_at  TEXT,                                    -- ISO-8601 UTC, set on approve/reject/expire
     telegram_message_id INTEGER,                         -- message id returned by Telegram
@@ -32,6 +33,11 @@ def init_db() -> None:
     """Create tables if they don't exist yet."""
     with _get_connection() as conn:
         conn.executescript(CREATE_TABLE_SQL)
+        # Migration: add telegram_chat_id column if missing (existing DBs)
+        try:
+            conn.execute("ALTER TABLE auth_requests ADD COLUMN telegram_chat_id TEXT NOT NULL DEFAULT ''")
+        except Exception:
+            pass  # column already exists
 
 
 @contextmanager
@@ -54,16 +60,17 @@ def insert_request(
     user_id: str,
     action: str,
     hmac_digest: str,
+    telegram_chat_id: str = "",
 ) -> dict:
     """Insert a new pending auth request. Returns the row as a dict."""
     now = datetime.now(timezone.utc).isoformat()
     with _get_connection() as conn:
         conn.execute(
             """
-            INSERT INTO auth_requests (request_id, user_id, action, hmac_digest, created_at)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO auth_requests (request_id, user_id, action, hmac_digest, telegram_chat_id, created_at)
+            VALUES (?, ?, ?, ?, ?, ?)
             """,
-            (request_id, user_id, action, hmac_digest, now),
+            (request_id, user_id, action, hmac_digest, telegram_chat_id, now),
         )
     return get_request(request_id)
 

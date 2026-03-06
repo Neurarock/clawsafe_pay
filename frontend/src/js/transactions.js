@@ -4,7 +4,7 @@
  * form submission, and fast-polling after submit.
  */
 
-import { API, API_KEY, CHAINS, state } from './state.js';
+import { API, API_KEY, DEFAULT_AGENT_KEY, CHAINS, state } from './state.js';
 import {
   esc, toast, weiToDisplay, weiToEth, shortAddr, shortHash,
   timeAgo, chainBadge, explorerLink, statusBadge, animStat,
@@ -158,11 +158,25 @@ export function renderTimeline() {
 
 // ── Form Submission ──────────────────────────────────────────────────
 export function setupTxForm() {
+  // Pre-fill the API key field with the default agent key if available
+  const txApiKeyInput = document.getElementById('tx-api-key');
+  if (txApiKeyInput && DEFAULT_AGENT_KEY) {
+    txApiKeyInput.value = DEFAULT_AGENT_KEY;
+  }
+
   document.getElementById('txForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     const btn     = document.getElementById('txBtn');
     const btnText = document.getElementById('txBtnText');
     const btnSpin = document.getElementById('txBtnSpin');
+
+    // Require API key
+    const txApiKey = document.getElementById('tx-api-key').value.trim();
+    if (!txApiKey) {
+      toast('\u2717 API key is required to submit transactions', 'error');
+      return;
+    }
+
     btn.disabled = true;
     btnText.textContent = 'Submitting\u2026';
     btnSpin.style.display = 'inline-block';
@@ -177,7 +191,7 @@ export function setupTxForm() {
     try {
       const r = await fetch(`${API}/intent`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-API-Key': API_KEY },
+        headers: { 'Content-Type': 'application/json', 'X-API-Key': txApiKey },
         body: JSON.stringify({
           intent_id: intentId,
           from_user:    document.getElementById('tx-from').value,
@@ -224,3 +238,17 @@ export function startFastPoll() {
 // Expose to inline onclick handlers
 window.setFilter   = setFilter;
 window.fetchIntents = fetchIntents;
+
+// ── TX API Key Visibility Toggle ─────────────────────────────────────
+export function toggleTxKeyVisibility() {
+  const input = document.getElementById('tx-api-key');
+  const eye   = document.getElementById('tx-key-eye');
+  if (input.type === 'password') {
+    input.type = 'text';
+    eye.textContent = '\uD83D\uDE48';
+  } else {
+    input.type = 'password';
+    eye.textContent = '\uD83D\uDC41';
+  }
+}
+window.toggleTxKeyVisibility = toggleTxKeyVisibility;

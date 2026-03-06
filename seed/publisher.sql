@@ -43,6 +43,7 @@ CREATE TABLE IF NOT EXISTS api_users (
     name            TEXT NOT NULL,
     api_key_hash    TEXT NOT NULL UNIQUE,
     api_key_prefix  TEXT NOT NULL,
+    telegram_chat_id TEXT NOT NULL DEFAULT '',
     allowed_assets  TEXT NOT NULL DEFAULT '["*"]',
     allowed_chains  TEXT NOT NULL DEFAULT '["*"]',
     max_amount_wei  TEXT NOT NULL DEFAULT '0',
@@ -53,8 +54,8 @@ CREATE TABLE IF NOT EXISTS api_users (
     updated_at      TEXT NOT NULL
 );
 
-INSERT OR IGNORE INTO api_users VALUES('3cf512f255da4981','OPEN_CLAW_TEST_1','a4a96c27a6efd5254c80503e8ad82ac390769abde2d0e568ff22039b3bf6f5e8','csp_q7lQBj21','["*"]','["*"]','1000000','10000000000000',5,1,'2026-03-05T14:09:33.240440+00:00','2026-03-05T14:09:33.240440+00:00');
-INSERT OR IGNORE INTO api_users VALUES('d3b6cf1d94ff4bca','Agent_Bob','5816d78fc374622b22310dc8f413d803686905fa913a81822d30668d860cf15e','csp_dZ55L9xo','["USDT"]','["*"]','10000','500000000',100,1,'2026-03-05T14:38:12.966616+00:00','2026-03-05T14:38:12.966616+00:00');
+INSERT OR IGNORE INTO api_users VALUES('3cf512f255da4981','OPEN_CLAW_TEST_1','a4a96c27a6efd5254c80503e8ad82ac390769abde2d0e568ff22039b3bf6f5e8','csp_q7lQBj21','','["*"]','["*"]','1000000','10000000000000',5,1,'2026-03-05T14:09:33.240440+00:00','2026-03-05T14:09:33.240440+00:00');
+INSERT OR IGNORE INTO api_users VALUES('d3b6cf1d94ff4bca','Agent_Bob','5816d78fc374622b22310dc8f413d803686905fa913a81822d30668d860cf15e','csp_dZ55L9xo','','["USDT"]','["*"]','10000','500000000',100,1,'2026-03-05T14:38:12.966616+00:00','2026-03-05T14:38:12.966616+00:00');
 
 -- ── api_user_daily_usage (empty — table only) ───────────────────────
 CREATE TABLE IF NOT EXISTS api_user_daily_usage (

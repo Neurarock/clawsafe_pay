@@ -55,7 +55,8 @@ async def _expire_stale_requests():
                 # Edit the Telegram message if possible
                 if req.get("telegram_message_id"):
                     await telegram_bot.edit_message_after_resolution(
-                        req["telegram_message_id"], "expired", rid
+                        req["telegram_message_id"], "expired", rid,
+                        chat_id_override=req.get("telegram_chat_id", ""),
                     )
         except Exception:
             logger.exception("Error in expiry task")
@@ -142,11 +143,16 @@ async def create_auth_request(payload: AuthRequest):
         user_id=payload.user_id,
         action=payload.action,
         hmac_digest=payload.hmac_digest,
+        telegram_chat_id=payload.telegram_chat_id,
     )
     logger.info("Auth request %s stored (user=%s)", payload.request_id, payload.user_id)
 
     # 4. Send Telegram prompt
-    msg_id = await telegram_bot.send_auth_prompt(payload.request_id, payload.user_id, payload.action)
+    chat_id_override = payload.telegram_chat_id or ""
+    msg_id = await telegram_bot.send_auth_prompt(
+        payload.request_id, payload.user_id, payload.action,
+        chat_id_override=chat_id_override,
+    )
     if msg_id:
         db.set_telegram_message_id(payload.request_id, msg_id)
 

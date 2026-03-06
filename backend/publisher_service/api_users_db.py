@@ -28,6 +28,7 @@ CREATE TABLE IF NOT EXISTS api_users (
     name            TEXT NOT NULL,
     api_key_hash    TEXT NOT NULL UNIQUE,
     api_key_prefix  TEXT NOT NULL,
+    telegram_chat_id TEXT NOT NULL DEFAULT '',
     allowed_assets  TEXT NOT NULL DEFAULT '["*"]',
     allowed_chains  TEXT NOT NULL DEFAULT '["*"]',
     max_amount_wei  TEXT NOT NULL DEFAULT '0',
@@ -83,6 +84,12 @@ def init_api_users_db() -> None:
     """Create the api_users and daily_usage tables if they don't exist."""
     with _get_connection() as conn:
         conn.executescript(CREATE_API_USERS_SQL)
+        # Migration: add telegram_chat_id column if missing (existing DBs)
+        try:
+            conn.execute("ALTER TABLE api_users ADD COLUMN telegram_chat_id TEXT NOT NULL DEFAULT ''")
+            logger.info("Migrated api_users table: added telegram_chat_id column")
+        except sqlite3.OperationalError:
+            pass  # column already exists
     logger.info("API users tables initialised")
 
 
@@ -95,13 +102,18 @@ def create_api_user(
     max_amount_wei: str = "0",
     daily_limit_wei: str = "0",
     rate_limit: int = 0,
+    telegram_chat_id: str = "",
+    api_key_override: str = "",
 ) -> dict:
     """
     Create a new API user and return its details **including the plaintext
     API key** (shown only once).
+
+    If api_key_override is provided, use that as the raw key instead of
+    generating a new one (used for seeding the default API key).
     """
     user_id = uuid4().hex[:16]
-    raw_key = f"csp_{secrets.token_urlsafe(32)}"
+    raw_key = api_key_override if api_key_override else f"csp_{secrets.token_urlsafe(32)}"
     key_hash = _hash_key(raw_key)
     key_prefix = raw_key[:12]
     now = _now_iso()
@@ -113,12 +125,13 @@ def create_api_user(
         conn.execute(
             """
             INSERT INTO api_users
-              (id, name, api_key_hash, api_key_prefix, allowed_assets,
-               allowed_chains, max_amount_wei, daily_limit_wei, rate_limit,
-               is_active, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
+              (id, name, api_key_hash, api_key_prefix, telegram_chat_id,
+               allowed_assets, allowed_chains, max_amount_wei, daily_limit_wei,
+               rate_limit, is_active, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
             """,
-            (user_id, name, key_hash, key_prefix, assets_json, chains_json,
+            (user_id, name, key_hash, key_prefix, telegram_chat_id,
+             assets_json, chains_json,
              max_amount_wei, daily_limit_wei, rate_limit, now, now),
         )
 
@@ -156,6 +169,7 @@ def update_api_user(
     user_id: str,
     *,
     name: str | None = None,
+    telegram_chat_id: str | None = None,
     allowed_assets: list[str] | None = None,
     allowed_chains: list[str] | None = None,
     max_amount_wei: str | None = None,
@@ -174,6 +188,9 @@ def update_api_user(
     if name is not None:
         updates.append("name = ?")
         params.append(name)
+    if telegram_chat_id is not None:
+        updates.append("telegram_chat_id = ?")
+        params.append(telegram_chat_id)
     if allowed_assets is not None:
         updates.append("allowed_assets = ?")
         params.append(json.dumps(allowed_assets))
@@ -286,6 +303,10 @@ def _row_to_dict(row: sqlite3.Row) -> dict:
     d["allowed_assets"] = json.loads(d.get("allowed_assets", '["*"]'))
     d["allowed_chains"] = json.loads(d.get("allowed_chains", '["*"]'))
     d["is_active"] = bool(d.get("is_active", 0))
+    # Expose boolean flag for whether telegram_chat_id is set (hide actual value)
+    raw_chat_id = d.pop("telegram_chat_id", "")
+    d["telegram_chat_id"] = raw_chat_id  # keep for internal use
+    d["telegram_chat_id_set"] = bool(raw_chat_id)
     # Never expose the hash via API
     d.pop("api_key_hash", None)
     return d

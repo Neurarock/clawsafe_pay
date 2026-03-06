@@ -122,6 +122,7 @@ async def _sign_workflow(tx_id: str, req: SignRequest):
             request_id=auth_request_id,
             user_id=req.user_id,
             action=action_desc,
+            telegram_chat_id=req.telegram_chat_id,
         )
 
         if auth_status == "approved":

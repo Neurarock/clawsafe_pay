@@ -19,6 +19,7 @@ class SignRequest(BaseModel):
     note: str = Field(default="", description="Human-readable description of the transaction")
     chain: str = Field(default="sepolia", description="Target chain slug (e.g. sepolia, base)")
     from_address: str = Field(default="", description="Sender wallet address (empty = default wallet)")
+    telegram_chat_id: str = Field(default="", description="Per-agent Telegram chat ID for auth notifications")
 
 
 class SignResponse(BaseModel):

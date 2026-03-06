@@ -16,7 +16,7 @@ from signer_service.security import compute_hmac
 logger = logging.getLogger("signer_service.auth_client")
 
 
-async def request_auth(request_id: str, user_id: str, action: str) -> str:
+async def request_auth(request_id: str, user_id: str, action: str, telegram_chat_id: str = "") -> str:
     """
     Submit an auth request to user_auth and poll until resolved.
 
@@ -30,6 +30,7 @@ async def request_auth(request_id: str, user_id: str, action: str) -> str:
         "user_id": user_id,
         "action": action,
         "hmac_digest": hmac_digest,
+        "telegram_chat_id": telegram_chat_id,
     }
 
     async with httpx.AsyncClient(timeout=10) as client:

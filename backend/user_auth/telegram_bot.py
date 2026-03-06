@@ -26,13 +26,21 @@ def _escape_md2(text: str) -> str:
     return "".join(out)
 
 
-async def send_auth_prompt(request_id: str, user_id: str, action: str) -> Optional[int]:
+async def send_auth_prompt(request_id: str, user_id: str, action: str, chat_id_override: str = "") -> Optional[int]:
     """
     Send an inline-keyboard message to the configured Telegram chat
     asking the user to approve or reject the auth request.
 
+    If chat_id_override is provided, sends to that chat instead of the
+    global default TELEGRAM_CHAT_ID.
+
     Returns the Telegram message_id on success, or None on failure.
     """
+    target_chat_id = chat_id_override if chat_id_override else TELEGRAM_CHAT_ID
+    if not target_chat_id:
+        logger.warning("No Telegram chat ID configured — cannot send auth prompt for %s", request_id)
+        return None
+
     esc = _escape_md2
 
     # Short request id for display (first 8 chars)
@@ -59,7 +67,7 @@ async def send_auth_prompt(request_id: str, user_id: str, action: str) -> Option
     }
 
     payload = {
-        "chat_id": TELEGRAM_CHAT_ID,
+        "chat_id": target_chat_id,
         "text": text,
         "parse_mode": "MarkdownV2",
         "reply_markup": inline_keyboard,
@@ -72,7 +80,7 @@ async def send_auth_prompt(request_id: str, user_id: str, action: str) -> Option
             data = resp.json()
             if data.get("ok"):
                 message_id = data["result"]["message_id"]
-                logger.info("Telegram message %s sent for request %s", message_id, request_id)
+                logger.info("Telegram message %s sent for request %s (chat=%s)", message_id, request_id, target_chat_id)
                 return message_id
             else:
                 logger.error("Telegram API error: %s", data)
@@ -82,11 +90,12 @@ async def send_auth_prompt(request_id: str, user_id: str, action: str) -> Option
         return None
 
 
-async def edit_message_after_resolution(message_id: int, status: str, request_id: str) -> None:
+async def edit_message_after_resolution(message_id: int, status: str, request_id: str, chat_id_override: str = "") -> None:
     """
     Edit the original Telegram message to reflect the final status,
     removing the inline keyboard so the buttons can't be tapped again.
     """
+    target_chat_id = chat_id_override if chat_id_override else TELEGRAM_CHAT_ID
     esc = _escape_md2
     short_id = request_id[:8] if len(request_id) > 8 else request_id
 
@@ -108,7 +117,7 @@ async def edit_message_after_resolution(message_id: int, status: str, request_id
     )
 
     payload = {
-        "chat_id": TELEGRAM_CHAT_ID,
+        "chat_id": target_chat_id,
         "message_id": message_id,
         "text": text,
         "parse_mode": "MarkdownV2",

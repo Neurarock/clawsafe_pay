@@ -27,6 +27,8 @@ def patch_config(tmp_path, monkeypatch):
     db_path = str(tmp_path / "test_intents.db")
     monkeypatch.setattr(config, "DATABASE_PATH", db_path)
     monkeypatch.setattr(config, "PUBLISHER_API_KEY", API_KEY)
+    # Prevent auto-seeding of default API user in tests
+    monkeypatch.setattr(config, "DEFAULT_PUBLISHER_API", "")
     # Speed up signer polling in tests
     monkeypatch.setattr(config, "SIGNER_POLL_INTERVAL_SECONDS", 0.01)
     monkeypatch.setattr(config, "SIGNER_POLL_TIMEOUT_SECONDS", 0.1)

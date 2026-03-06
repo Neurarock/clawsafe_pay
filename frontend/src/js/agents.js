@@ -40,6 +40,9 @@ export function renderAgentTable() {
     const sBadge = u.is_active
       ? '<span class="badge badge-active">\u25CF Active</span>'
       : '<span class="badge badge-inactive">\u25CF Inactive</span>';
+    const tgBadge = u.telegram_chat_id_set
+      ? '<span class="badge badge-active" title="Telegram Chat ID configured">\uD83D\uDCF1 TG</span>'
+      : '<span class="badge badge-inactive" title="No Telegram Chat ID — uses default">📱 —</span>';
     const assets = u.allowed_assets.map(a =>
       a === '*' ? '<span class="badge badge-wildcard">\u2731 all</span>' : `<span class="badge badge-asset">${esc(a)}</span>`
     ).join('');
@@ -52,7 +55,7 @@ export function renderAgentTable() {
     const limits = `<span class="mono" style="font-size:9px">${maxTx} / ${daily}<br>${rate}</span>`;
 
     return `<tr>
-      <td>${sBadge}</td>
+      <td>${sBadge}<br>${tgBadge}</td>
       <td><strong>${esc(u.name)}</strong><br><span class="mono" style="color:var(--muted);font-size:9px">${u.id.slice(0, 8)}\u2026</span></td>
       <td class="mono" style="color:var(--cyan)">${u.api_key_prefix}\u2026</td>
       <td>${assets}</td>
@@ -133,6 +136,7 @@ export function setupAgentForm() {
 
     const body = {
       name:            document.getElementById('ag-name').value.trim(),
+      telegram_chat_id: document.getElementById('ag-telegram-chat-id').value.trim(),
       allowed_assets:  JSON.parse(document.getElementById('ag-assets-val').value),
       allowed_chains:  JSON.parse(document.getElementById('ag-chains-val').value),
       max_amount_wei:  document.getElementById('ag-max-tx').value || '0',
@@ -186,6 +190,9 @@ export function openEdit(id) {
   if (!u) return;
   document.getElementById('ed-id').value     = u.id;
   document.getElementById('ed-name').value   = u.name;
+  document.getElementById('ed-telegram-chat-id').value = '';  // always blank — hidden for security
+  document.getElementById('ed-telegram-chat-id').placeholder =
+    u.telegram_chat_id_set ? '(configured — enter new value to change)' : 'Leave empty for default';
   document.getElementById('ed-assets').value = u.allowed_assets.join(',');
   document.getElementById('ed-chains').value = u.allowed_chains.join(',');
   document.getElementById('ed-max-tx').value = u.max_amount_wei;
@@ -212,6 +219,11 @@ export function setupEditForm() {
       rate_limit:      parseInt(document.getElementById('ed-rate').value) || 0,
       is_active:       document.getElementById('ed-active').value === 'true',
     };
+    // Only send telegram_chat_id if user entered a value (don't overwrite with empty)
+    const tgVal = document.getElementById('ed-telegram-chat-id').value.trim();
+    if (tgVal) {
+      body.telegram_chat_id = tgVal;
+    }
 
     try {
       const r = await fetch(`${API}/api-users/${id}`, {

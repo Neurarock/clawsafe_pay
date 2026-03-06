@@ -69,7 +69,10 @@ async def _handle_callback_in_background(request_id: str, action_str: str) -> No
     # Edit Telegram message to remove buttons
     if req.get("telegram_message_id"):
         try:
-            await telegram_bot.edit_message_after_resolution(req["telegram_message_id"], status, request_id)
+            await telegram_bot.edit_message_after_resolution(
+                req["telegram_message_id"], status, request_id,
+                chat_id_override=req.get("telegram_chat_id", ""),
+            )
         except Exception:
             logger.exception("Failed to edit Telegram message for %s", request_id)
 

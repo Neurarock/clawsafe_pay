@@ -21,3 +21,6 @@ PUBLISHER_API_KEY: str = os.getenv("PUBLISHER_API_KEY", "change-me-publisher-key
 # In Docker the internal hostname (http://publisher:8002) is unreachable from
 # the browser, so set this to the host-mapped URL (http://localhost:8002).
 PUBLISHER_BROWSER_URL: str = os.getenv("PUBLISHER_BROWSER_URL", PUBLISHER_API_URL)
+
+# Default agent API key for the dashboard user
+DEFAULT_PUBLISHER_API: str = os.getenv("DEFAULT_PUBLISHER_API", "")

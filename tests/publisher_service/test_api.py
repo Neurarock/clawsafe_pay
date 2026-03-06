@@ -24,6 +24,17 @@ def client(monkeypatch):
         yield c
 
 
+def _make_agent_key(client) -> str:
+    """Create a test agent and return its API key (for intent submission)."""
+    resp = client.post(
+        "/api-users",
+        json={"name": "test-agent", "allowed_assets": ["*"], "allowed_chains": ["*"]},
+        headers={"X-API-Key": API_KEY},
+    )
+    assert resp.status_code == 201
+    return resp.json()["api_key"]
+
+
 # ── Health ───────────────────────────────────────────────────────────────────
 
 def test_health_no_auth(client):
@@ -47,7 +58,8 @@ def test_submit_intent_wrong_api_key(client):
 # ── POST /intent — success ────────────────────────────────────────────────────
 
 def test_submit_intent_returns_202(client):
-    resp = client.post("/intent", json=VALID_INTENT, headers={"X-API-Key": API_KEY})
+    agent_key = _make_agent_key(client)
+    resp = client.post("/intent", json=VALID_INTENT, headers={"X-API-Key": agent_key})
     assert resp.status_code == 202
     data = resp.json()
     assert data["intent_id"] == VALID_INTENT["intent_id"]
@@ -57,7 +69,8 @@ def test_submit_intent_returns_202(client):
 # ── POST /intent — duplicate ──────────────────────────────────────────────────
 
 def test_submit_intent_duplicate_returns_409(client):
-    headers = {"X-API-Key": API_KEY}
+    agent_key = _make_agent_key(client)
+    headers = {"X-API-Key": agent_key}
     client.post("/intent", json=VALID_INTENT, headers=headers)
     resp = client.post("/intent", json=VALID_INTENT, headers=headers)
     assert resp.status_code == 409
@@ -66,8 +79,9 @@ def test_submit_intent_duplicate_returns_409(client):
 # ── POST /intent — invalid address ───────────────────────────────────────────
 
 def test_submit_intent_invalid_address_returns_422(client):
+    agent_key = _make_agent_key(client)
     bad = {**VALID_INTENT, "intent_id": "test-bad-addr", "to_address": "not-an-address"}
-    resp = client.post("/intent", json=bad, headers={"X-API-Key": API_KEY})
+    resp = client.post("/intent", json=bad, headers={"X-API-Key": agent_key})
     assert resp.status_code == 422
 
 
@@ -79,9 +93,9 @@ def test_get_intent_not_found_returns_404(client):
 
 
 def test_get_intent_returns_current_status(client):
-    headers = {"X-API-Key": API_KEY}
-    client.post("/intent", json=VALID_INTENT, headers=headers)
-    resp = client.get(f"/intent/{VALID_INTENT['intent_id']}", headers=headers)
+    agent_key = _make_agent_key(client)
+    client.post("/intent", json=VALID_INTENT, headers={"X-API-Key": agent_key})
+    resp = client.get(f"/intent/{VALID_INTENT['intent_id']}", headers={"X-API-Key": API_KEY})
     assert resp.status_code == 200
     data = resp.json()
     assert data["intent_id"] == VALID_INTENT["intent_id"]
@@ -97,7 +111,8 @@ def test_submit_intent_injection_score_at_block_threshold_rejected(client, monke
         return FilterResult(score=8, reason="explicit prompt override", model_used="test-model")
 
     monkeypatch.setattr(app_module, "check_injection", _high_score_filter)
-    resp = client.post("/intent", json={**VALID_INTENT, "intent_id": "test-inj-block"}, headers={"X-API-Key": API_KEY})
+    agent_key = _make_agent_key(client)
+    resp = client.post("/intent", json={**VALID_INTENT, "intent_id": "test-inj-block"}, headers={"X-API-Key": agent_key})
     assert resp.status_code == 400
     detail = resp.json()["detail"]
     assert detail["error"] == "injection_detected"
@@ -109,5 +124,6 @@ def test_submit_intent_warn_band_allows_request(client, monkeypatch):
         return FilterResult(score=6, reason="suspicious phrasing", model_used="test-model")
 
     monkeypatch.setattr(app_module, "check_injection", _warn_score_filter)
-    resp = client.post("/intent", json={**VALID_INTENT, "intent_id": "test-inj-warn"}, headers={"X-API-Key": API_KEY})
+    agent_key = _make_agent_key(client)
+    resp = client.post("/intent", json={**VALID_INTENT, "intent_id": "test-inj-warn"}, headers={"X-API-Key": agent_key})
     assert resp.status_code == 202

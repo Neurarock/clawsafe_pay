@@ -57,7 +57,32 @@ async def lifespan(app: FastAPI):
     api_users_db.init_api_users_db()
     wallets_db.init_wallets_db()
     logger.info("Publisher service DB initialised at %s", db.DATABASE_PATH)
+    # Seed the default dashboard API user from DEFAULT_PUBLISHER_API env var
+    _seed_default_api_user()
     yield
+
+
+def _seed_default_api_user():
+    """Create a default agent backed by DEFAULT_PUBLISHER_API if not already present."""
+    default_key = config.DEFAULT_PUBLISHER_API
+    if not default_key:
+        return
+    # Check if an agent with this key already exists
+    existing = api_users_db.get_api_user_by_key(default_key)
+    if existing:
+        logger.info("Default dashboard API user already exists: %s", existing["name"])
+        return
+    user = api_users_db.create_api_user(
+        name="Dashboard (default)",
+        allowed_assets=["*"],
+        allowed_chains=["*"],
+        max_amount_wei="0",
+        daily_limit_wei="0",
+        rate_limit=0,
+        telegram_chat_id="",
+        api_key_override=default_key,
+    )
+    logger.info("Seeded default dashboard API user: %s (key prefix: %s)", user["name"], user["api_key_prefix"])
 
 
 app = FastAPI(
@@ -104,7 +129,22 @@ async def health():
 
 @app.post("/intent", response_model=IntentResponse, status_code=202)
 async def submit_intent(request: Request, payload: PaymentIntent, _key=Depends(require_api_key)):
-    """Accept a PaymentIntent from OpenClaw. Store it and start the workflow."""
+    """Accept a PaymentIntent from OpenClaw. Store it and start the workflow.
+
+    Transactions ALWAYS require an agent API key — even from the dashboard.
+    The admin key alone cannot submit transactions; it must be an agent key.
+    """
+    # ── Agent key required for transactions ──────────────────────────────────
+    api_user = getattr(request.state, "api_user", None)
+    is_admin = getattr(request.state, "is_admin", False)
+    if is_admin and api_user is None:
+        raise HTTPException(
+            status_code=403,
+            detail="Transactions require an agent API key. "
+                   "The admin key cannot submit transactions directly. "
+                   "Please use an agent key (create one in the Agent section).",
+        )
+
     # ── Injection filter ─────────────────────────────────────────────────────
     filter_result = await check_injection(
         intent_id=payload.intent_id,
@@ -113,7 +153,6 @@ async def submit_intent(request: Request, payload: PaymentIntent, _key=Depends(r
         note=payload.note,
     )
     # ── Agent permission check ────────────────────────────────────────────
-    api_user = getattr(request.state, "api_user", None)
     check_agent_permission(
         api_user,
         chain=payload.chain,
@@ -363,6 +402,7 @@ async def create_api_user_endpoint(body: CreateApiUser):
         max_amount_wei=body.max_amount_wei,
         daily_limit_wei=body.daily_limit_wei,
         rate_limit=body.rate_limit,
+        telegram_chat_id=body.telegram_chat_id,
     )
     logger.info("Created API user %s (%s)", user["id"], user["name"])
     return user
@@ -392,6 +432,7 @@ async def update_api_user_endpoint(user_id: str, body: UpdateApiUser):
     updated = api_users_db.update_api_user(
         user_id,
         name=body.name,
+        telegram_chat_id=body.telegram_chat_id,
         allowed_assets=body.allowed_assets,
         allowed_chains=body.allowed_chains,
         max_amount_wei=body.max_amount_wei,

@@ -18,6 +18,7 @@ import time
 
 import publisher_service.config as config
 import publisher_service.database as db
+import publisher_service.api_users_db as api_users_db
 from publisher_service.clients import (
     DownstreamError,
     call_reviewer,
@@ -159,6 +160,14 @@ async def run_intent_workflow(intent_id: str) -> None:
     )
 
     try:
+        # Resolve the telegram_chat_id from the agent who submitted this intent
+        agent_chat_id = ""
+        api_user_id = row.get("api_user_id", "")
+        if api_user_id:
+            agent = api_users_db.get_api_user(api_user_id)
+            if agent:
+                agent_chat_id = agent.get("telegram_chat_id", "")
+
         signer_resp = await submit_to_signer(
             to=draft.to,
             value_wei=draft.value_wei,
@@ -168,6 +177,7 @@ async def run_intent_workflow(intent_id: str) -> None:
             gas_limit=draft.gas_limit,
             chain=intent.chain,
             from_address=from_address,
+            telegram_chat_id=agent_chat_id,
         )
     except DownstreamError as exc:
         db.update_status(intent_id, "failed", error=f"Signer submit error: {exc}")

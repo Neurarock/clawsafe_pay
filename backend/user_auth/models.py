@@ -15,6 +15,10 @@ class AuthRequest(BaseModel):
         ...,
         description="HMAC-SHA256 digest computed over request_id:user_id:action with the shared secret",
     )
+    telegram_chat_id: str = Field(
+        default="",
+        description="Per-agent Telegram chat ID override. If empty, uses the global default.",
+    )
 
 
 class AuthResponse(BaseModel):

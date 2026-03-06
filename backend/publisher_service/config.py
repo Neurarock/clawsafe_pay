@@ -20,6 +20,9 @@ SIGNER_SERVICE_URL: str = os.getenv("SIGNER_SERVICE_URL", "http://localhost:8001
 # ── API key for incoming requests ─────────────────────────────────────────────
 PUBLISHER_API_KEY: str = os.getenv("PUBLISHER_API_KEY", "change-me-publisher-key")
 
+# ── Default publisher API key (seeded as an agent) ────────────────────────────
+DEFAULT_PUBLISHER_API: str = os.getenv("DEFAULT_PUBLISHER_API", "")
+
 # ── Signer wallet ─────────────────────────────────────────────────────────────
 SIGNER_FROM_ADDRESS: str = os.getenv("SIGNER_FROM_ADDRESS", "0x0000000000000000000000000000000000000000")
 # All wallet addresses available for sending (loaded from WALLET_ADDR_N env vars)

@@ -55,8 +55,10 @@
     <li><strong>Python 3.11+</strong> — <code>python3 --version</code></li>
     <li><strong>pip</strong> &amp; <strong>venv</strong> — usually bundled with Python</li>
     <li><strong>Git</strong> — for cloning the repository</li>
+    <li><strong>Docker + Docker Compose</strong> — optional, for one-command local runs</li>
     <li><strong>A Telegram account</strong> — for 2FA approval of transactions</li>
-    <li><strong>RPC endpoints</strong> — Infura, Alchemy, or a local node for your target chains</li>
+    <li><strong>A funded Sepolia wallet</strong> — configure via <code>WALLET_ADDR_1</code> and <code>WALLET_PRIV_KEY_1</code></li>
+    <li><strong>RPC endpoint</strong> — set <code>SEPOLIA_RPC_URL</code> (public, Infura, Alchemy, or your own node)</li>
   </ul>
 
   <div class="info-box tip">
@@ -74,76 +76,115 @@
 <span class="prompt">$</span> source .venv/bin/activate</pre>
   </div>
 
-  <p>Install dependencies for each service:</p>
+  <p>Install dependencies for backend services, reviewer, and frontend:</p>
   <div class="code-block">
     <div class="code-header"><span>Terminal</span><button class="code-copy" onclick="copyBlock(this)">Copy</button></div>
-    <pre><span class="prompt">$</span> pip install -r publisher_service/requirements.txt
-<span class="prompt">$</span> pip install -r signer_service/requirements.txt
-<span class="prompt">$</span> pip install -r user_auth/requirements.txt
-<span class="prompt">$</span> pip install -r transaction_builder/requirements.txt</pre>
+    <pre><span class="prompt">$</span> pip install -r backend/publisher_service/requirements.txt \
+  -r backend/signer_service/requirements.txt \
+  -r backend/user_auth/requirements.txt \
+  -r reviewer_service/requirements.txt \
+  -r frontend/requirements.txt</pre>
+  </div>
+
+  <p>Prefer a containerized setup? Use Docker Compose instead:</p>
+  <div class="code-block">
+    <div class="code-header"><span>Terminal</span><button class="code-copy" onclick="copyBlock(this)">Copy</button></div>
+    <pre><span class="prompt">$</span> cp .env.example .env
+<span class="prompt">$</span> docker compose up --build</pre>
   </div>
 
   <!-- Step 3 -->
   <h2 id="env"><span class="step-badge">3</span> Environment Configuration</h2>
-  <p>Create a <code>.env</code> file in the project root. Here's the template:</p>
+  <p>Create your environment file from the repo template, then edit required values:</p>
+  <div class="code-block">
+    <div class="code-header"><span>Terminal</span><button class="code-copy" onclick="copyBlock(this)">Copy</button></div>
+    <pre><span class="prompt">$</span> cp .env.example .env</pre>
+  </div>
+  <p>Minimum values you should set in <code>.env</code>:</p>
   <div class="code-block">
     <div class="code-header"><span>.env</span><button class="code-copy" onclick="copyBlock(this)">Copy</button></div>
-    <pre><span class="comment"># ── Chains ─────────────────────────────────────────</span>
-<span class="hl">SEPOLIA_RPC_URL</span>=https://sepolia.infura.io/v3/YOUR_KEY
-<span class="hl">BASE_RPC_URL</span>=https://mainnet.base.org
-
-<span class="comment"># ── Signer Service ─────────────────────────────────</span>
-<span class="hl">SIGNER_PRIVATE_KEY</span>=0xYOUR_PRIVATE_KEY
-<span class="hl">SIGNER_HMAC_SECRET</span>=your-shared-hmac-secret
-<span class="hl">SIGNER_PORT</span>=8001
-
-<span class="comment"># ── Publisher Service ──────────────────────────────</span>
-<span class="hl">PUBLISHER_HMAC_SECRET</span>=your-shared-hmac-secret
-<span class="hl">PUBLISHER_PORT</span>=8002
-
-<span class="comment"># ── User Auth (Telegram) ──────────────────────────</span>
+    <pre><span class="comment"># ── User Auth + shared security ───────────────────</span>
 <span class="hl">TELEGRAM_BOT_TOKEN</span>=123456:ABC-your-bot-token
 <span class="hl">TELEGRAM_CHAT_ID</span>=your-chat-id
-<span class="hl">USER_AUTH_PORT</span>=8000
+<span class="hl">HMAC_SECRET</span>=replace-with-random-secret
+<span class="hl">AUTH_SERVICE_PORT</span>=8000
+<span class="hl">SIGNER_SERVICE_CALLBACK_URL</span>=http://localhost:8001/auth/callback
 
-<span class="comment"># ── Optional ──────────────────────────────────────</span>
-<span class="hl">REVIEWER_ENABLED</span>=false
-<span class="hl">REVIEWER_MODEL</span>=claude-sonnet-4-20250514</pre>
+<span class="comment"># ── Signer Service ─────────────────────────────────</span>
+<span class="hl">SIGNER_SERVICE_PORT</span>=8001
+<span class="hl">USER_AUTH_URL</span>=http://localhost:8000
+<span class="hl">WALLET_ADDR_1</span>=0xYourSepoliaWalletAddress
+<span class="hl">WALLET_PRIV_KEY_1</span>=0xYourSepoliaPrivateKey
+
+<span class="comment"># ── Publisher Service ──────────────────────────────</span>
+<span class="hl">PUBLISHER_SERVICE_PORT</span>=8002
+<span class="hl">PUBLISHER_API_KEY</span>=change-me-publisher-key
+<span class="hl">SIGNER_SERVICE_URL</span>=http://localhost:8001
+<span class="hl">SIGNER_FROM_ADDRESS</span>=0xYourSepoliaWalletAddress
+<span class="hl">SEPOLIA_RPC_URL</span>=https://rpc.sepolia.org
+<span class="hl">POLICY_RECIPIENT_ALLOWLIST</span>=*
+
+<span class="comment"># ── Frontend + Reviewer (optional) ───────────────</span>
+<span class="hl">DASHBOARD_PORT</span>=8008
+<span class="hl">REVIEWER_SERVICE_URL</span>=http://localhost:8003
+<span class="hl">REVIEWER_SERVICE_PORT</span>=8003</pre>
   </div>
 
   <div class="info-box danger">
     <span class="icon">🔐</span>
-    <div><strong>Never commit your <code>.env</code> file.</strong> It contains private keys and secrets. The <code>.gitignore</code> already excludes it.</div>
+    <div><strong>Never commit your <code>.env</code> file.</strong> It contains private keys, API keys, and shared secrets. The project <code>.gitignore</code> already excludes it.</div>
   </div>
 
   <!-- Step 4 -->
   <h2 id="services"><span class="step-badge">4</span> Launch Services</h2>
-  <p>Start each service in a separate terminal (or use the demo script):</p>
+  <p>For manual startup, export <code>PYTHONPATH</code> once so backend modules resolve correctly:</p>
+  <div class="code-block">
+    <div class="code-header"><span>Terminal</span><button class="code-copy" onclick="copyBlock(this)">Copy</button></div>
+    <pre><span class="prompt">$</span> export PYTHONPATH=backend:$PYTHONPATH</pre>
+  </div>
+  <p>Then start each service in a separate terminal:</p>
   <div class="code-block">
     <div class="code-header"><span>Terminal 1 — User Auth</span><button class="code-copy" onclick="copyBlock(this)">Copy</button></div>
     <pre><span class="prompt">$</span> python -m user_auth.main
-<span class="comment"># → User Auth running on :8000</span></pre>
+<span class="comment"># → user_auth on :8000</span></pre>
   </div>
   <div class="code-block">
     <div class="code-header"><span>Terminal 2 — Signer</span><button class="code-copy" onclick="copyBlock(this)">Copy</button></div>
     <pre><span class="prompt">$</span> python -m signer_service.main
-<span class="comment"># → Signer Service running on :8001</span></pre>
+<span class="comment"># → signer_service on :8001</span></pre>
   </div>
   <div class="code-block">
     <div class="code-header"><span>Terminal 3 — Publisher</span><button class="code-copy" onclick="copyBlock(this)">Copy</button></div>
     <pre><span class="prompt">$</span> python -m publisher_service.main
-<span class="comment"># → Publisher API running on :8002</span></pre>
+<span class="comment"># → publisher_service on :8002</span></pre>
+  </div>
+  <div class="code-block">
+    <div class="code-header"><span>Terminal 4 — Frontend</span><button class="code-copy" onclick="copyBlock(this)">Copy</button></div>
+    <pre><span class="prompt">$</span> python -m frontend.main
+<span class="comment"># → frontend dashboard/home on :8008</span></pre>
+  </div>
+  <div class="code-block">
+    <div class="code-header"><span>Terminal 5 — Reviewer (optional)</span><button class="code-copy" onclick="copyBlock(this)">Copy</button></div>
+    <pre><span class="prompt">$</span> python -m reviewer_service.main
+<span class="comment"># → reviewer_service on :8003</span></pre>
   </div>
 
   <p>Or use the all-in-one demo launcher:</p>
   <div class="code-block">
     <div class="code-header"><span>Terminal</span><button class="code-copy" onclick="copyBlock(this)">Copy</button></div>
-    <pre><span class="prompt">$</span> bash demo.sh</pre>
+    <pre><span class="prompt">$</span> bash demo.sh
+<span class="prompt">$</span> bash demo.sh stop</pre>
+  </div>
+
+  <p>Container alternative:</p>
+  <div class="code-block">
+    <div class="code-header"><span>Terminal</span><button class="code-copy" onclick="copyBlock(this)">Copy</button></div>
+    <pre><span class="prompt">$</span> docker compose up --build</pre>
   </div>
 
   <div class="info-box tip">
     <span class="icon">✅</span>
-    <div>Once running, visit <a href="http://localhost:8002">http://localhost:8002</a> for the homepage and <a href="http://localhost:8002/demo">http://localhost:8002/demo</a> for the live dashboard.</div>
+    <div>Once running, open <a href="http://localhost:8008">http://localhost:8008</a> (homepage/setup/security) and <a href="http://localhost:8008/demo">http://localhost:8008/demo</a> (interactive dashboard). The publisher API is at <a href="http://localhost:8002">http://localhost:8002</a>.</div>
   </div>
 
   <!-- Step 5 -->
@@ -160,43 +201,52 @@
 
   <div class="info-box warn">
     <span class="icon">⚠️</span>
-    <div>Only add your own Telegram chat ID. The bot will send transaction approval requests to this chat. Anyone with access can approve or reject transactions.</div>
+    <div>Only use your own chat ID (or a tightly controlled ops group). Anyone who can press the Telegram approval button can authorize a real transaction.</div>
   </div>
 
   <!-- Step 6 -->
   <h2 id="first-tx"><span class="step-badge">6</span> Your First Transaction</h2>
-  <p>Submit a test payment intent via the API:</p>
+  <p>Submit a test payment intent via <code>publisher_service</code>:</p>
   <div class="code-block">
     <div class="code-header"><span>cURL</span><button class="code-copy" onclick="copyBlock(this)">Copy</button></div>
-    <pre><span class="prompt">$</span> curl -X POST http://localhost:8002/intents \
+    <pre><span class="prompt">$</span> curl -X POST http://localhost:8002/intent \
   -H "Content-Type: application/json" \
-  -H "X-API-Key: your-api-key" \
+  -H "X-API-Key: change-me-publisher-key" \
   -d '{
+    <span class="str">"intent_id"</span>: <span class="str">"pay-001"</span>,
+    <span class="str">"from_user"</span>: <span class="str">"alice"</span>,
+    <span class="str">"to_user"</span>: <span class="str">"bob"</span>,
     <span class="str">"chain"</span>: <span class="str">"sepolia"</span>,
-    <span class="str">"to"</span>: <span class="str">"0x742d35Cc6634C0532925a3b844Bc9e7595f..."</span>,
-    <span class="str">"amount"</span>: <span class="str">"0.001"</span>,
     <span class="str">"asset"</span>: <span class="str">"ETH"</span>,
-    <span class="str">"agent_id"</span>: <span class="str">"test-agent"</span>
+    <span class="str">"amount_wei"</span>: <span class="str">"1000000000000000"</span>,
+    <span class="str">"to_address"</span>: <span class="str">"0xd8da6bf26964af9d7eed9e03e53415d37aa96045"</span>,
+    <span class="str">"note"</span>: <span class="str">"first payment test"</span>
   }'</pre>
   </div>
-  <p>The flow: <strong>Publisher</strong> validates → builds draft transaction → sends to <strong>Signer</strong> → Signer requests Telegram approval → on Approve, signs &amp; broadcasts → returns tx hash.</p>
+  <p>Poll status after approving in Telegram:</p>
+  <div class="code-block">
+    <div class="code-header"><span>cURL</span><button class="code-copy" onclick="copyBlock(this)">Copy</button></div>
+    <pre><span class="prompt">$</span> curl -X GET http://localhost:8002/intent/pay-001 \
+  -H "X-API-Key: change-me-publisher-key"</pre>
+  </div>
+  <p>Flow summary: <strong>publisher_service</strong> validates intent → builds draft transaction → calls <strong>reviewer_service</strong> → submits to <strong>signer_service</strong> → <strong>user_auth</strong> requests Telegram approval → signer broadcasts and returns tx hash.</p>
 
   <!-- Step 7 -->
   <h2 id="chains"><span class="step-badge">7</span> Adding Chains</h2>
-  <p>ClawSafe Pay supports multiple chains through its registry system. Each chain module lives in <code>chains/</code>:</p>
+  <p>ClawSafe Pay uses a registry-based chain architecture in <code>backend/chains/</code>:</p>
   <div class="code-block">
-    <div class="code-header"><span>chains/</span></div>
-    <pre>chains/
+    <div class="code-header"><span>backend/chains/</span></div>
+    <pre>backend/chains/
 ├── evm/
 │   ├── sepolia/    <span class="comment"># Ethereum Sepolia testnet</span>
 │   └── base_l2/    <span class="comment"># Base L2 mainnet</span>
-├── solana/         <span class="comment"># Solana mainnet/devnet</span>
-├── bitcoin/        <span class="comment"># Bitcoin mainnet/testnet</span>
-├── cardano/        <span class="comment"># Cardano mainnet</span>
-├── zcash/          <span class="comment"># Zcash mainnet</span>
+├── solana/         <span class="comment"># Solana family modules</span>
+├── bitcoin/        <span class="comment"># Bitcoin family modules</span>
+├── cardano/        <span class="comment"># Cardano family modules</span>
+├── zcash/          <span class="comment"># Zcash family modules</span>
 └── tokens/         <span class="comment"># USDC, USDT token support</span></pre>
   </div>
-  <p>To add a new EVM chain, create a folder in <code>chains/evm/</code> with a <code>__init__.py</code> that registers the chain config, provider, builder, and signer. The chain is then available for use in payment intents.</p>
+  <p>To add a new chain, create a module package with config/provider/builder/signer and call <code>register_chain(...)</code> in that package's <code>__init__.py</code>. Then import the package from <code>backend/chains/__init__.py</code> so it auto-registers at startup.</p>
 
   <div class="info-box tip">
     <span class="icon">🧩</span>
@@ -207,12 +257,13 @@
   <h2 id="production"><span class="step-badge">8</span> Production Deployment</h2>
   <p>For production, follow these additional steps:</p>
   <ul>
-    <li><strong>Air-gap the signer:</strong> Run the signer service on a separate, firewalled machine that only accepts connections from the publisher</li>
-    <li><strong>Use a hardware wallet:</strong> For maximum security, integrate with a Ledger or Trezor instead of a software key</li>
-    <li><strong>Enable the reviewer:</strong> Set <code>REVIEWER_ENABLED=true</code> to add an LLM risk analysis step for every transaction</li>
-    <li><strong>Set spend limits:</strong> Configure per-agent daily and per-transaction limits in the policy engine</li>
-    <li><strong>Enable HTTPS:</strong> Put services behind a reverse proxy (nginx, Caddy) with TLS termination</li>
-    <li><strong>Rotate secrets:</strong> Regularly rotate HMAC secrets and API keys</li>
+    <li><strong>Isolate signer network access:</strong> Keep <code>signer_service</code> on a private network reachable only by <code>publisher_service</code></li>
+    <li><strong>Protect signing keys:</strong> Store <code>WALLET_PRIV_KEY_N</code> in a secret manager and rotate regularly</li>
+    <li><strong>Rotate auth secrets:</strong> Rotate <code>HMAC_SECRET</code>, <code>PUBLISHER_API_KEY</code>, and any agent keys on a schedule</li>
+    <li><strong>Enforce policy limits:</strong> Set strict <code>POLICY_MAX_AMOUNT_WEI</code> and <code>POLICY_RECIPIENT_ALLOWLIST</code></li>
+    <li><strong>Enable reviewer hardening:</strong> Configure <code>REVIEWER_SERVICE_URL</code> and supply <code>ZAI_API_KEY</code> for LLM risk analysis</li>
+    <li><strong>Use TLS and ingress controls:</strong> Place public endpoints behind HTTPS + IP filtering / WAF</li>
+    <li><strong>Prefer container orchestration:</strong> Run with <code>docker compose</code> or your platform's equivalent for restart/health policies</li>
   </ul>
 
   <div class="info-box danger">
