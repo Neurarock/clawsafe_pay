@@ -47,6 +47,7 @@
       <li><a href="#injection">Prompt Injection Protection</a></li>
       <li><a href="#policy-engine">Policy Engine</a></li>
       <li><a href="#hmac">Inter-Service Authentication</a></li>
+      <li><a href="#webhook-security">Webhook &amp; Proxy Security</a></li>
       <li><a href="#comparison">Comparison with Alternatives</a></li>
     </ol>
   </div>
@@ -149,7 +150,7 @@
       <div class="layer-num l5">5</div>
       <div class="layer-info">
         <h4>Human-in-the-Loop 2FA</h4>
-        <p>The signer service sends a Telegram message with full transaction details. The human taps Approve or Reject. No approval = no signing. Configurable timeout (default 360s) forces explicit action.</p>
+        <p>The signer service sends a Telegram message with full transaction details. The human taps Approve or Reject. No approval = no signing. Configurable timeout (default 360s) forces explicit action. Supports both webhook (instant) and long-polling delivery modes.</p>
       </div>
     </div>
     <div class="layer">
@@ -296,6 +297,38 @@ hmac.<span class="hl">compare_digest</span>(computed, received)  <span class="co
     <li><strong>Mutual authentication:</strong> Both publisher→signer and signer→user_auth verify HMAC signatures</li>
     <li><strong>Transaction binding:</strong> SHA-256 digest over <code>chain_id:nonce:to:value:gas_limit</code> binds the signature to exact transaction parameters</li>
   </ul>
+
+  <!-- Webhook & Proxy Security -->
+  <h2 id="webhook-security"><span class="shield">🌐</span> Webhook &amp; Proxy Security</h2>
+
+  <p>When exposed via ngrok, the frontend acts as a single-tunnel reverse proxy. Security measures ensure that internal services remain protected:</p>
+
+  <h3>Telegram Webhook Verification</h3>
+  <ul>
+    <li><strong>Secret token header:</strong> When <code>TELEGRAM_WEBHOOK_SECRET</code> is configured, every incoming Telegram callback must include a matching <code>X-Telegram-Bot-Api-Secret-Token</code> header. Invalid or missing tokens are rejected with HTTP 403.</li>
+    <li><strong>Auto-registration:</strong> The webhook is registered automatically on service startup when <code>TELEGRAM_WEBHOOK_URL</code> is set. Stale webhooks are cleaned up when switching to long-polling mode.</li>
+    <li><strong>Admin endpoints:</strong> <code>POST /admin/webhook/register</code>, <code>DELETE /admin/webhook</code>, and <code>GET /admin/webhook/info</code> allow runtime webhook management.</li>
+  </ul>
+
+  <h3>Rate Limiting</h3>
+  <ul>
+    <li><strong>Publisher service:</strong> 600 requests per minute per IP address. The <code>/health</code>, <code>/docs</code>, and <code>/openapi.json</code> endpoints are exempt to prevent monitoring and documentation access from being throttled.</li>
+    <li><strong>All other services:</strong> Per-IP rate limiting protects against brute-force and abuse.</li>
+  </ul>
+
+  <h3>Proxy Architecture</h3>
+  <ul>
+    <li><strong>Path-based routing:</strong> The frontend proxies <code>/publisher/*</code>, <code>/telegram/*</code>, and <code>/user-auth/*</code> to their respective internal services. Only these specific prefixes are forwarded — all other paths serve static frontend content.</li>
+    <li><strong>Header forwarding:</strong> The Telegram proxy forwards the <code>X-Telegram-Bot-Api-Secret-Token</code> header. The publisher proxy forwards <code>X-API-Key</code>. No internal headers are leaked outward.</li>
+    <li><strong>Internal network isolation:</strong> Backend services communicate on a Docker internal network. Only the frontend port (8008) is exposed to the host / ngrok tunnel.</li>
+  </ul>
+
+  <div class="info-box critical reveal">
+    <span class="icon">🔒</span>
+    <div>
+      <strong>Single entry point:</strong> With ngrok, all external traffic enters through port 8008. The signer service and user_auth service are never directly exposed to the internet — they are only reachable through the frontend proxy or Docker internal networking.
+    </div>
+  </div>
 
   <!-- Comparison -->
   <h2 id="comparison"><span class="shield">📊</span> Comparison with Alternatives</h2>

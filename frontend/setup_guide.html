@@ -42,6 +42,7 @@
       <li><a href="#env">Environment Configuration</a></li>
       <li><a href="#services">Launch Services</a></li>
       <li><a href="#telegram">Telegram Bot Setup</a></li>
+      <li><a href="#ngrok">External Access via ngrok</a></li>
       <li><a href="#first-tx">Your First Transaction</a></li>
       <li><a href="#chains">Adding Chains</a></li>
       <li><a href="#production">Production Deployment</a></li>
@@ -127,7 +128,11 @@
 <span class="comment"># ── Frontend + Reviewer (optional) ───────────────</span>
 <span class="hl">DASHBOARD_PORT</span>=8008
 <span class="hl">REVIEWER_SERVICE_URL</span>=http://localhost:8003
-<span class="hl">REVIEWER_SERVICE_PORT</span>=8003</pre>
+<span class="hl">REVIEWER_SERVICE_PORT</span>=8003
+
+<span class="comment"># ── Telegram Webhook (optional — instant delivery) ──</span>
+<span class="comment"># TELEGRAM_WEBHOOK_URL=https://&lt;subdomain&gt;.ngrok-free.dev/telegram/webhook</span>
+<span class="comment"># TELEGRAM_WEBHOOK_SECRET=&lt;random-secret&gt;</span></pre>
   </div>
 
   <div class="info-box danger">
@@ -204,8 +209,44 @@
     <div>Only use your own chat ID (or a tightly controlled ops group). Anyone who can press the Telegram approval button can authorize a real transaction.</div>
   </div>
 
-  <!-- Step 6 -->
-  <h2 id="first-tx"><span class="step-badge">6</span> Your First Transaction</h2>
+  <h3>Delivery Mode</h3>
+  <p>Choose how Telegram updates reach your service:</p>
+  <ul>
+    <li><strong>Webhook mode</strong> (recommended): Set <code>TELEGRAM_WEBHOOK_URL</code> in <code>.env</code>. The webhook is auto-registered when the service starts — no manual curl needed. Optionally set <code>TELEGRAM_WEBHOOK_SECRET</code> for callback verification.</li>
+    <li><strong>Long-polling mode</strong> (default): Leave <code>TELEGRAM_WEBHOOK_URL</code> empty. The service polls Telegram every few seconds. Works behind NATs with no public URL.</li>
+  </ul>
+
+  <div class="info-box tip">
+    <span class="icon">💡</span>
+    <div>Admin endpoints are available at <code>POST /admin/webhook/register</code>, <code>DELETE /admin/webhook</code>, and <code>GET /admin/webhook/info</code> to manage the webhook at runtime.</div>
+  </div>
+
+  <!-- Step 6 - ngrok -->
+  <h2 id="ngrok"><span class="step-badge">6</span> External Access via ngrok</h2>
+  <p>Expose the entire platform through a single ngrok tunnel on the frontend port:</p>
+  <div class="code-block">
+    <div class="code-header"><span>Terminal</span><button class="code-copy" onclick="copyBlock(this)">Copy</button></div>
+    <pre><span class="prompt">$</span> ngrok http 8008</pre>
+  </div>
+  <p>The frontend automatically proxies requests to internal services:</p>
+  <ul>
+    <li><code>/publisher/*</code> → publisher_service on port 8002 (payment API)</li>
+    <li><code>/telegram/*</code> → user_auth on port 8000 (Telegram webhook callbacks)</li>
+    <li><code>/user-auth/*</code> → user_auth on port 8000 (admin &amp; health endpoints)</li>
+    <li><code>/*</code> → frontend on port 8008 (dashboard, pages, static assets)</li>
+  </ul>
+  <p>Then set the webhook URL in your <code>.env</code> so Telegram callbacks arrive via the proxy:</p>
+  <div class="code-block">
+    <div class="code-header"><span>.env</span><button class="code-copy" onclick="copyBlock(this)">Copy</button></div>
+    <pre>TELEGRAM_WEBHOOK_URL=https://&lt;your-subdomain&gt;.ngrok-free.dev/telegram/webhook</pre>
+  </div>
+  <div class="info-box tip">
+    <span class="icon">🌐</span>
+    <div>Agents only need <strong>one URL</strong> (the ngrok URL) with a <code>/publisher</code> prefix to reach the payment API. Example: <code>https://&lt;sub&gt;.ngrok-free.dev/publisher/intent</code></div>
+  </div>
+
+  <!-- Step 7 -->
+  <h2 id="first-tx"><span class="step-badge">7</span> Your First Transaction</h2>
   <p>Submit a test payment intent via <code>publisher_service</code>:</p>
   <div class="code-block">
     <div class="code-header"><span>cURL</span><button class="code-copy" onclick="copyBlock(this)">Copy</button></div>
@@ -231,8 +272,8 @@
   </div>
   <p>Flow summary: <strong>publisher_service</strong> validates intent → builds draft transaction → calls <strong>reviewer_service</strong> → submits to <strong>signer_service</strong> → <strong>user_auth</strong> requests Telegram approval → signer broadcasts and returns tx hash.</p>
 
-  <!-- Step 7 -->
-  <h2 id="chains"><span class="step-badge">7</span> Adding Chains</h2>
+  <!-- Step 8 -->
+  <h2 id="chains"><span class="step-badge">8</span> Adding Chains</h2>
   <p>ClawSafe Pay uses a registry-based chain architecture in <code>backend/chains/</code>:</p>
   <div class="code-block">
     <div class="code-header"><span>backend/chains/</span></div>
@@ -253,8 +294,8 @@
     <div>Browse pre-built chain modules on <a href="https://clawhub.ai" target="_blank">ClawHub</a> — install new chains with a single command.</div>
   </div>
 
-  <!-- Step 8 -->
-  <h2 id="production"><span class="step-badge">8</span> Production Deployment</h2>
+  <!-- Step 9 -->
+  <h2 id="production"><span class="step-badge">9</span> Production Deployment</h2>
   <p>For production, follow these additional steps:</p>
   <ul>
     <li><strong>Isolate signer network access:</strong> Keep <code>signer_service</code> on a private network reachable only by <code>publisher_service</code></li>
