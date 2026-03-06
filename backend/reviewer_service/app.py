@@ -81,6 +81,7 @@ async def review(req: ReviewRequest):
         intent_id=intent_id,
         draft_tx=draft_tx,
         current_base_fee_wei=req.current_base_fee_wei,
+        calldata_description=req.calldata_description,
     )
 
     report = ReviewReport(

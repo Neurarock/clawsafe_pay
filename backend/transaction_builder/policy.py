@@ -64,18 +64,13 @@ def validate_draft_tx(
     """
     warnings: list[str] = []
 
-    # No contract calldata — MVP only allows native transfers
-    if draft.data not in ("0x", "", b""):
+    # Gas limit: native transfers use 21k, contract calls use gas_limit_contract_call
+    has_calldata = draft.data not in ("0x", "", b"")
+    gas_cap = config.gas_limit_contract_call if has_calldata else config.gas_limit_native_transfer
+    if draft.gas_limit > gas_cap:
         raise PolicyError(
-            "Transaction calldata must be empty (0x) — "
-            "contract interactions are not supported in MVP"
-        )
-
-    # Gas limit must match the fixed native-transfer constant
-    if draft.gas_limit > config.gas_limit_native_transfer:
-        raise PolicyError(
-            f"gas_limit {draft.gas_limit} exceeds maximum "
-            f"{config.gas_limit_native_transfer} for native transfers"
+            f"gas_limit {draft.gas_limit} exceeds maximum {gas_cap} "
+            f"for {'contract calls' if has_calldata else 'native transfers'}"
         )
 
     # Fee hard cap: max_fee_per_gas <= multiplier * base_fee + tip

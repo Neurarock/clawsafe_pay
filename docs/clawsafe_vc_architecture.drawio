@@ -1,0 +1,114 @@
+<mxfile host="app.diagrams.net" modified="2026-03-06T00:00:00.000Z" agent="Codex" version="24.7.17" type="device">
+  <diagram id="vc-arch-1" name="VC Architecture">
+    <mxGraphModel dx="1660" dy="980" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1920" pageHeight="1080" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+
+        <mxCell id="title" value="ClawSafe Pay: Secure On-Chain Execution for OpenClaw Agents" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=24;fontStyle=1;fontColor=#111827;" vertex="1" parent="1">
+          <mxGeometry x="40" y="20" width="980" height="40" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="left_agents" value="OpenClaw Agents&#xa;(request payments / contract calls)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DBEAFE;strokeColor=#2563EB;fontSize=14;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="180" width="240" height="90" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="left_dashboard" value="Admin Dashboard&#xa;Policy + Monitoring" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E0F2FE;strokeColor=#0891B2;fontSize=14;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="360" width="240" height="90" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="platform_boundary" value="ClawSafe Control Plane (Segregated Infrastructure)" style="rounded=1;whiteSpace=wrap;html=1;dashed=1;dashPattern=8 4;strokeWidth=2;fillColor=#F9FAFB;strokeColor=#6B7280;fontSize=14;fontStyle=1;align=left;verticalAlign=top;spacingTop=10;spacingLeft=10;" vertex="1" parent="1">
+          <mxGeometry x="330" y="90" width="1080" height="520" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="publisher" value="publisher_service&#xa;Intent Gateway + Orchestrator&#xa;Enforces spend limits, chain/asset policy,&#xa;activity controls, and workflow state" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DCFCE7;strokeColor=#15803D;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="390" y="180" width="300" height="130" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="tx_builder" value="transaction_builder&#xa;Deterministic DraftTx Build&#xa;+ policy validation&#xa;(gas/limits/allowlists)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ECFDF5;strokeColor=#16A34A;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="760" y="170" width="240" height="120" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="reviewer" value="reviewer_service&#xa;Independent AI Transaction Review&#xa;(risk verdict: OK / WARN / BLOCK)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FEF3C7;strokeColor=#D97706;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="1040" y="170" width="300" height="120" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="signer" value="signer_service (Key Custody Boundary)&#xa;Only component that can sign/broadcast&#xa;Encrypted private keys loaded here only" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FEE2E2;strokeColor=#DC2626;fontSize=13;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="760" y="350" width="300" height="130" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="user_auth" value="user_auth service&#xa;Telegram approval workflow&#xa;(Approve / Reject / Expire)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F3E8FF;strokeColor=#7E22CE;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="1100" y="360" width="240" height="110" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="right_telegram" value="You (Human Reviewer)&#xa;Telegram" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EDE9FE;strokeColor=#6D28D9;fontSize=14;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1460" y="360" width="220" height="90" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="right_chain" value="Blockchain Network&#xa;(Sepolia / Base / etc.)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFEDD5;strokeColor=#C2410C;fontSize=14;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1460" y="200" width="220" height="90" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="note1" value="OpenClaw never has key access" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#9CA3AF;fontSize=12;fontColor=#111827;" vertex="1" parent="1">
+          <mxGeometry x="390" y="500" width="260" height="42" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="note2" value="Human-in-the-loop for high-risk payments" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#9CA3AF;fontSize=12;fontColor=#111827;" vertex="1" parent="1">
+          <mxGeometry x="680" y="500" width="290" height="42" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="note3" value="Independent AI review + policy gates" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#9CA3AF;fontSize=12;fontColor=#111827;" vertex="1" parent="1">
+          <mxGeometry x="1000" y="500" width="290" height="42" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="e1" value="1) Payment intent request" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#2563EB;fontSize=11;" edge="1" parent="1" source="left_agents" target="publisher">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="e2" value="2) Configure policy, limits, whitelists" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#0891B2;fontSize=11;" edge="1" parent="1" source="left_dashboard" target="publisher">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="e3" value="3) Build deterministic DraftTx" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#16A34A;fontSize=11;" edge="1" parent="1" source="publisher" target="tx_builder">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="e4" value="4) Request independent review" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#D97706;fontSize=11;" edge="1" parent="1" source="publisher" target="reviewer">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="e5" value="5) Verdict + reasons" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#D97706;dashed=1;fontSize=11;" edge="1" parent="1" source="reviewer" target="publisher">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="e6" value="6) Submit approved draft for signing" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#DC2626;fontSize=11;" edge="1" parent="1" source="publisher" target="signer">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="e7" value="7) Auth request" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#7E22CE;fontSize=11;" edge="1" parent="1" source="signer" target="user_auth">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="e8" value="8) Telegram approve / reject" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#6D28D9;fontSize=11;" edge="1" parent="1" source="user_auth" target="right_telegram">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="e9" value="9) Auth result callback" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#7E22CE;dashed=1;fontSize=11;" edge="1" parent="1" source="user_auth" target="signer">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="e10" value="10) Sign + broadcast" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#C2410C;fontSize=11;" edge="1" parent="1" source="signer" target="right_chain">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="e11" value="11) Tx hash + final status" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#C2410C;dashed=1;fontSize=11;" edge="1" parent="1" source="right_chain" target="signer">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="e12" value="12) Monitoring + audit trail" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#0891B2;dashed=1;fontSize=11;" edge="1" parent="1" source="publisher" target="left_dashboard">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

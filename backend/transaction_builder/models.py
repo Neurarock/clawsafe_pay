@@ -47,9 +47,26 @@ class PaymentIntent(BaseModel):
     to_address: str = Field(..., description="Recipient address")
     from_address: str = Field(default="", description="Sender wallet address (empty = use default)")
     note: str = Field(default="", description="Human-readable memo")
+    calldata: str = Field(
+        default="0x",
+        description="Hex-encoded calldata for contract interactions. '0x' = simple transfer.",
+    )
+    calldata_description: str = Field(
+        default="",
+        description="Agent's plain-English description of what the calldata does.",
+    )
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc)
     )
+
+    @field_validator("calldata")
+    @classmethod
+    def validate_calldata(cls, v: str) -> str:
+        if v == "0x" or v == "":
+            return "0x"
+        if not re.fullmatch(r"0x[0-9a-fA-F]*", v):
+            raise ValueError("calldata must be a hex string starting with '0x'")
+        return v.lower()
 
     @field_validator("to_address")
     @classmethod
@@ -138,6 +155,10 @@ class PolicyConfig(BaseModel):
     gas_limit_native_transfer: int = Field(
         default=21_000,
         description="Fixed gas limit for native ETH transfers",
+    )
+    gas_limit_contract_call: int = Field(
+        default=300_000,
+        description="Default gas limit for contract interactions (non-empty calldata)",
     )
     # Fee cap: max_fee_per_gas <= multiplier * current_base_fee + tip
     max_fee_per_gas_multiplier: float = Field(

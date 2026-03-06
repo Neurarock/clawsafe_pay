@@ -332,6 +332,7 @@ async def submit_intent(request: Request, payload: PaymentIntent, _key=Depends(r
         chain=payload.chain,
         asset=payload.asset,
         amount_wei=payload.amount_wei,
+        to_address=payload.to_address,
     )
 
     if filter_result.score >= config.INJECTION_BLOCK_THRESHOLD:
@@ -368,6 +369,8 @@ async def submit_intent(request: Request, payload: PaymentIntent, _key=Depends(r
         asset=payload.asset,
         from_address=payload.from_address,
         api_user_id=api_user["id"] if api_user else "",
+        calldata=payload.calldata,
+        calldata_description=payload.calldata_description,
     )
     logger.info("Intent %s received (from=%s to=%s chain=%s from_address=%s)", payload.intent_id, payload.from_user, payload.to_user, payload.chain, payload.from_address or 'default')
 

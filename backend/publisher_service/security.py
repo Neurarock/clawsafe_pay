@@ -68,6 +68,7 @@ def check_agent_permission(
     chain: str = "",
     asset: str = "",
     amount_wei: str = "0",
+    to_address: str = "",
 ) -> None:
     """Raise HTTPException if the agent lacks permission for the operation.
 
@@ -75,6 +76,17 @@ def check_agent_permission(
     """
     if api_user is None:
         return  # admin — no restrictions
+
+    # ── Contract/recipient allowlist check ───────────────────────────
+    allowed_contracts = api_user.get("allowed_contracts", ["*"])
+    if "*" not in allowed_contracts and to_address:
+        normalised = [a.lower() for a in allowed_contracts]
+        if to_address.lower() not in normalised:
+            raise HTTPException(
+                status_code=403,
+                detail=f"Agent '{api_user['name']}' is not permitted to interact with "
+                       f"contract/address {to_address}. Allowed: {allowed_contracts}",
+            )
 
     # ── Asset check ──────────────────────────────────────────────────
     allowed_assets = api_user.get("allowed_assets", ["*"])
