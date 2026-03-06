@@ -28,7 +28,7 @@ def _make_agent_key(client) -> str:
     """Create a test agent and return its API key (for intent submission)."""
     resp = client.post(
         "/api-users",
-        json={"name": "test-agent", "allowed_assets": ["*"], "allowed_chains": ["*"]},
+        json={"name": "test-agent", "bot_goal": "Test agent for unit tests", "allowed_assets": ["*"], "allowed_chains": ["*"]},
         headers={"X-API-Key": API_KEY},
     )
     assert resp.status_code == 201

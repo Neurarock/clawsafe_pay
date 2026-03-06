@@ -69,7 +69,7 @@ prompt-injection protection.
 | **user_auth**        | `8000`       | `python -m user_auth.main`            |
 | **signer_service**   | `8001`       | `python -m signer_service.main`       |
 | **publisher_service** | `8002`      | `python -m publisher_service.main`    |
-| **reviewer_service** | `8003`       | *(reserved — not yet implemented)*    |
+| **reviewer_service** | `8003`       | `python -m reviewer_service.main`     |
 | **frontend**         | `8008`       | `python -m frontend.main`             |
 | **transaction_builder** | *(library)* | Imported by publisher_service       |
 
@@ -88,6 +88,48 @@ the default wallet (`SIGNER_FROM_ADDRESS`) is used.
 | ------------------------- | --------- | ---- | ---------------------------------------------- |
 | `GET /wallets`            | publisher | none | Returns `{"wallets": [...], "default": "0x…"}` |
 | `GET /wallets`            | signer    | none | Returns `{"wallets": [...]}`                   |
+
+### API User / Agent Management
+
+Each external caller (bot, agent, integration) receives its own **agent API
+key** with granular permission controls. The original `PUBLISHER_API_KEY`
+becomes the **admin key** used to manage agents via the dashboard.
+
+| Feature | Description |
+| --- | --- |
+| **Bot Type & Goal** | Categorise agents (`personal`, `dca_trader`, `spot_trader`, etc.) with a free-text goal |
+| **Per-Agent Telegram Chat** | Each agent can route approval prompts to its own Telegram chat ID |
+| **Approval Mode** | `always_human`, `auto_within_limits`, or `human_if_above_threshold` |
+| **Rolling Window Limits** | `window_limit_wei` + `window_seconds` for sliding-window spend caps |
+| **Allowed Contracts** | Restrict which recipient/contract addresses the agent may target |
+| **Allowed Assets / Chains** | Token + chain allowlists per agent |
+| **Per-Tx & Daily Limits** | `max_amount_wei` and `daily_limit_wei` enforced on `POST /intent` |
+
+> See [docs/api_user_management.md](docs/api_user_management.md) for full API
+> reference, dashboard guide, and schema details.
+
+### Reviewer Service
+
+The **reviewer_service** (port 8003) analyses draft transactions using the
+**Z.AI GLM** language model for safety assessment before signing:
+
+- Receives `POST /review` with a `DraftTx` and current base fee.
+- Analyses the transaction for anomalies (gas manipulation, suspicious
+  recipients, unusual amounts).
+- Returns a `ReviewReport` with verdict `OK`, `WARN`, or `BLOCK`.
+
+A `BLOCK` verdict halts the pipeline immediately. If the reviewer is
+unreachable, the publisher defaults to `WARN` and continues.
+
+### Z.AI & Injection Protection
+
+| Feature | Config | Description |
+| --- | --- | --- |
+| **Policy Generation** | `ZAI_API_KEY`, `ZAI_API_BASE`, `ZAI_MODEL` | AI-powered policy suggestions for new agents via `POST /api-users/generate-policy` |
+| **Policy Chat** | same | Multi-turn policy configuration chat via `POST /api-users/policy-chat` |
+| **Agent Instruction Chat** | same | Natural-language tx planning via `POST /agent-instruction` |
+| **Tx Review** | same | AI safety review of draft transactions in reviewer_service |
+| **Prompt-Injection Filter** | `FLOCK_API_KEY`, `INJECTION_WARN_THRESHOLD`, `INJECTION_BLOCK_THRESHOLD` | Flock API scores user fields; score ≥ block threshold → rejected |
 
 All ports are configurable via `.env` environment variables.
 
@@ -162,8 +204,15 @@ SIGNER_FROM_ADDRESS=<default-wallet-address>  # default sender if from_address i
 SEPOLIA_RPC_URL=https://rpc.sepolia.org
 POLICY_RECIPIENT_ALLOWLIST=*         # comma-separated addresses, or * for any
 
+# ── Z.AI LLM (policy generation, tx review, agent instruction) ──
+# ZAI_API_KEY=<your-zai-key>            # required for AI features
+# ZAI_API_BASE=https://api.z.ai/api/paas/v4
+# ZAI_MODEL=glm-5
+
 # ── FLOCK / INJECTION FILTER (optional) ──────────────────────────
 # FLOCK_API_KEY=<your-flock-key>
+# INJECTION_WARN_THRESHOLD=5            # 0-10 score, warn above this
+# INJECTION_BLOCK_THRESHOLD=8           # 0-10 score, block above this
 ```
 
 ### 4. Start Services (four terminals)
@@ -322,14 +371,18 @@ clawsafe_pay/
 │   │
 │   ├── publisher_service/        # Payment intent orchestrator (port 8002)
 │   │   ├── app.py                #   FastAPI endpoints
+│   │   ├── api_users_db.py       #   SQLite persistence (agent management)
+│   │   ├── api_user_models.py    #   Pydantic models for agent CRUD
 │   │   ├── clients.py            #   HTTP clients (reviewer, signer)
 │   │   ├── config.py             #   Environment config
-│   │   ├── database.py           #   SQLite persistence
+│   │   ├── database.py           #   SQLite persistence (payment intents)
 │   │   ├── injection_filter.py   #   Flock API prompt-injection detector
 │   │   ├── main.py               #   Uvicorn entry point
-│   │   ├── models.py             #   Pydantic models
+│   │   ├── models.py             #   Pydantic models (intents)
 │   │   ├── orchestrator.py       #   Background workflow state machine
-│   │   ├── security.py           #   API-key verification
+│   │   ├── security.py           #   API-key verification (admin + agent)
+│   │   ├── wallet_models.py      #   Pydantic models for wallet endpoints
+│   │   ├── wallets_db.py         #   SQLite persistence (wallet management)
 │   │   ├── Dockerfile
 │   │   └── requirements.txt
 │   │
@@ -343,6 +396,14 @@ clawsafe_pay/
 │   ├── chains/                   # Multi-chain support (EVM, Solana, Bitcoin, …)
 │   ├── contract_adviser/         # (placeholder — future contract analysis)
 │   └── wallets/                  # (placeholder — future wallet management)
+│
+├── reviewer_service/             # AI transaction reviewer (port 8003)
+│   ├── app.py                    #   FastAPI app (POST /review, GET /health)
+│   ├── config.py                 #   Environment config (Z.AI settings)
+│   ├── llm_client.py             #   Z.AI GLM integration
+│   ├── main.py                   #   Uvicorn entry point
+│   ├── models.py                 #   ReviewRequest, ReviewReport models
+│   └── requirements.txt          #   Python dependencies
 │
 ├── frontend/                     # Dashboard frontend service (port 8008)
 │   ├── app.py                    #   FastAPI app + feed proxies
@@ -372,6 +433,7 @@ clawsafe_pay/
     ├── publisher_service/
     │   ├── conftest.py
     │   ├── test_api.py
+    │   ├── test_api_users.py
     │   ├── test_clients.py
     │   ├── test_injection_filter.py
     │   ├── test_injection_filter_live.py
@@ -386,17 +448,30 @@ clawsafe_pay/
 
 ---
 
-## Reviewer Service (Future)
+## Reviewer Service
 
-The workflow is designed to support a **reviewer_service** on port `8003`.
-When implemented, the reviewer will:
+The **reviewer_service** is live on port `8003` and integrated into the
+transaction pipeline. It uses the **Z.AI GLM** model to analyse draft
+transactions before they proceed to signing.
 
-1. Receive `POST /review` with a `DraftTx` and current base fee.
-2. Analyze the transaction for anomalies (gas manipulation, suspicious
-   recipients, unusual amounts).
-3. Return a `ReviewReport` with verdict `OK`, `WARN`, or `BLOCK`.
+### Endpoints
 
-Currently, if the reviewer is unreachable, the publisher defaults to `WARN`
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/review` | Analyse a `DraftTx`; returns `ReviewReport` with `OK` / `WARN` / `BLOCK` |
+| `GET` | `/health` | Health check |
+
+### Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `REVIEWER_SERVICE_PORT` | `8003` | Listen port |
+| `ZAI_API_KEY` | — | Z.AI API key (required) |
+| `ZAI_API_BASE` | `https://api.z.ai/api/paas/v4` | Z.AI base URL |
+| `ZAI_MODEL` | `glm-5` | Model name |
+| `SEPOLIA_RPC_URL` | `https://rpc.sepolia.org` | RPC for on-chain lookups |
+
+If the reviewer is unreachable, the publisher defaults to `WARN`
 and continues the workflow. A `BLOCK` verdict halts the pipeline immediately.
 
 ---
@@ -405,9 +480,14 @@ and continues the workflow. A `BLOCK` verdict halts the pipeline immediately.
 
 - **HMAC-SHA256** authenticates requests between `signer_service ↔ user_auth`.
 - **API-key** (`X-API-Key` header) authenticates callers of `publisher_service`.
+  The admin key has full access; agent keys are permission-scoped.
+  **Only agent keys may submit transactions** (`POST /intent`).
+- **Per-agent Telegram routing** — each agent can have its own Telegram chat
+  ID for approval prompts, isolated from other agents.
 - **Rate limiting** is applied per-IP on all services (20–30 req/min).
 - **Prompt-injection filter** (optional, via Flock API) scores user-controlled
-  fields before processing. Score ≥ 8 → request rejected.
+  fields before processing. Score ≥ `INJECTION_BLOCK_THRESHOLD` (default 8)
+  → request rejected; score ≥ `INJECTION_WARN_THRESHOLD` (default 5) → logged.
 - **Private keys** are only loaded by `signer_service` — no other service
   has access to wallet keys. The multi-wallet registry maps each address to
   its private key; the publisher service only stores wallet *addresses*.

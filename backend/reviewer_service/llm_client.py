@@ -146,6 +146,14 @@ def _parse_llm_response(text: str, draft_tx: dict, current_base_fee_wei: int) ->
     }
 
 
+# On testnets like Sepolia the base fee can drop to near-zero (< 1 gwei).
+# In that scenario the standard EIP-1559 formula (max_fee = 2*base + tip)
+# produces a huge ratio against base_fee even though the absolute fee is
+# perfectly normal.  We floor the base fee at 1 gwei so the ratio check
+# is only meaningful when the base fee is in a realistic range.
+_MIN_BASE_FEE_WEI = 1_000_000_000  # 1 gwei
+
+
 def _heuristic_review(draft_tx: dict, current_base_fee_wei: int) -> dict:
     """
     Fallback heuristic analysis when LLM is unavailable or returns bad output.
@@ -156,8 +164,9 @@ def _heuristic_review(draft_tx: dict, current_base_fee_wei: int) -> dict:
     reasons = []
     verdict = "OK"
 
+    effective_base = max(current_base_fee_wei, _MIN_BASE_FEE_WEI)
     if current_base_fee_wei > 0:
-        ratio = max_fee / current_base_fee_wei
+        ratio = max_fee / effective_base
         if ratio > 10:
             verdict = "BLOCK"
             reasons.append(

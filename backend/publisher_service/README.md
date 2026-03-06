@@ -19,12 +19,38 @@ It accepts a `PaymentIntent`, builds a draft Sepolia transaction, gets reviewer 
 
 - `POST /intent`  
   Accepts a `PaymentIntent`, stores it, and starts async processing.
+  **Requires an agent API key** (admin key cannot submit transactions).
 - `GET /intent/{intent_id}`  
   Returns current status + stored draft/review/tx hash/error.
+- `GET /intents`  
+  Lists all intents with enriched metadata (`tx_type`, `risk_level`,
+  `trust_level`, `policy_decision`, `requires_human`, agent name).
 - `GET /health`  
   Health check.
 
 All intent endpoints require `X-API-Key`.
+
+### Agent Management (admin-only)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/api-users` | Create an agent (returns one-time API key). Required fields: `name`, `bot_goal`. |
+| `GET` | `/api-users` | List all agents |
+| `GET` | `/api-users/{user_id}` | Get single agent |
+| `PUT` | `/api-users/{user_id}` | Update agent permissions |
+| `DELETE` | `/api-users/{user_id}` | Deactivate agent (soft-delete) |
+| `POST` | `/api-users/{user_id}/regenerate-key` | Regenerate API key |
+| `GET` | `/api-users/{user_id}/usage` | Daily usage stats |
+| `GET` | `/api-users/{user_id}/intents` | List agent's intent history |
+
+### AI-Powered Features (Z.AI)
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `POST` | `/api-users/generate-policy` | Admin | AI policy suggestion based on bot type & goal |
+| `POST` | `/api-users/policy-chat` | Admin | Multi-turn policy configuration chat |
+| `POST` | `/agent-instruction` | Agent | Natural-language tx planning with on-chain context |
+| `GET` | `/agent-instruction/greeting` | None | Greeting message for instruction chat panel |
 
 ### Wallet Management (admin-only)
 

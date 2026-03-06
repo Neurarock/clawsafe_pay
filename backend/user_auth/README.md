@@ -215,6 +215,7 @@ Single table `auth_requests` in SQLite:
 | `action` | TEXT | Description of the action |
 | `status` | TEXT | `pending` / `approved` / `rejected` / `expired` |
 | `hmac_digest` | TEXT | HMAC-SHA256 digest |
+| `telegram_chat_id` | TEXT | Per-agent Telegram chat ID (empty = global default) |
 | `created_at` | TEXT | ISO-8601 UTC |
 | `resolved_at` | TEXT | ISO-8601 UTC (null while pending) |
 | `telegram_message_id` | INTEGER | Telegram message ID |

@@ -1,8 +1,9 @@
 # API User Management System
 
 Per-agent API key management for the **publisher_service** with granular
-permission controls: allowed tokens, allowed chains, per-transaction limits,
-and daily spending caps — all configurable from the dashboard.
+permission controls: bot categorisation, per-agent Telegram routing, approval
+modes, rolling spend windows, contract allowlists, and daily spending caps —
+all configurable from the dashboard.
 
 ---
 
@@ -12,14 +13,19 @@ Previously, publisher_service used a single shared `PUBLISHER_API_KEY` for all
 callers. The API User Management system replaces this with **per-agent keys**,
 each with its own permission set:
 
-| Feature                | Description                                           |
-| ---------------------- | ----------------------------------------------------- |
-| **Allowed Assets**     | Which tokens the agent can submit intents for (ETH, USDC, etc.) |
-| **Allowed Chains**     | Which chains the agent can operate on (sepolia, base, etc.)    |
-| **Per-Tx Limit**       | Maximum amount (in wei) per single transaction        |
-| **Daily Spending Cap** | Maximum total daily spend (resets at midnight UTC)    |
-| **Rate Limit**         | Per-agent requests-per-minute (0 = server default)    |
-| **Active/Inactive**    | Disable an agent instantly without deleting it        |
+| Feature                   | Description                                           |
+| ------------------------- | ----------------------------------------------------- |
+| **Bot Type & Goal**       | Categorise agents (`personal`, `dca_trader`, `spot_trader`, etc.) with a free-text goal description |
+| **Per-Agent Telegram**    | Route approval prompts to the agent's own Telegram chat ID |
+| **Approval Mode**         | `always_human`, `auto_within_limits`, or `human_if_above_threshold` |
+| **Allowed Assets**        | Which tokens the agent can submit intents for (ETH, USDC, etc.) |
+| **Allowed Chains**        | Which chains the agent can operate on (sepolia, base, etc.)    |
+| **Allowed Contracts**     | Which recipient/contract addresses the agent may target |
+| **Per-Tx Limit**          | Maximum amount (in wei) per single transaction        |
+| **Daily Spending Cap**    | Maximum total daily spend (resets at midnight UTC)    |
+| **Rolling Window Limit**  | `window_limit_wei` over `window_seconds` — sliding-window spend cap |
+| **Rate Limit**            | Per-agent requests-per-minute (0 = server default)    |
+| **Active/Inactive**       | Disable an agent instantly without deleting it        |
 
 The original `PUBLISHER_API_KEY` from `.env` becomes the **admin key** — it
 retains full access and is used to manage agents via the dashboard and API.
@@ -47,11 +53,13 @@ retains full access and is used to manage agents via the dashboard and API.
 │       ├─ Validate asset  ∈ allowed_assets             │
 │       ├─ Validate chain  ∈ allowed_chains             │
 │       ├─ Validate amount ≤ max_amount_wei             │
-│       └─ Validate daily total ≤ daily_limit_wei       │
+│       ├─ Validate daily total ≤ daily_limit_wei       │
+│       └─ Validate window total ≤ window_limit_wei     │
 │                                                       │
 │  api_users_db.py  (SQLite, same DB file)              │
 │    ├─ api_users table                                 │
-│    └─ api_user_daily_usage table                      │
+│    ├─ api_user_daily_usage table                      │
+│    └─ api_user_usage_events table                     │
 └──────────────────────────────────────────────────────┘
 ```
 
@@ -59,8 +67,8 @@ retains full access and is used to manage agents via the dashboard and API.
 
 | Key Type     | How to get it              | Permissions                          |
 | ------------ | -------------------------- | ------------------------------------ |
-| **Admin**    | `PUBLISHER_API_KEY` in `.env` | Everything — CRUD agents, submit intents, view dashboard |
-| **Agent**    | Created via `POST /api-users` | Only what the agent is permitted to do |
+| **Admin**    | `PUBLISHER_API_KEY` in `.env` | CRUD agents, view intents, manage wallets, dashboard. **Cannot** submit `POST /intent`. |
+| **Agent**    | Created via `POST /api-users` | Submit intents within permitted scope; access agent instruction chat |
 
 ---
 
@@ -87,10 +95,17 @@ Or click the **🔑 API Users** button in the main dashboard header.
 
 Fill in the form:
 - **Agent Name**: A descriptive name (e.g., "OpenClaw Production")
+- **Bot Type**: Category (`personal`, `ecommerce`, `dca_trader`, `spot_trader`, `nft_sniper`, `pump_fun_sniper`, `polymarket_copytrader`, `defi_borrower`, `custom`)
+- **Bot Goal**: Free-text description of what the agent does (required, 3–500 chars)
+- **Telegram Chat ID**: Per-agent Telegram chat for approval prompts (leave blank for global default)
+- **Approval Mode**: `always_human`, `auto_within_limits`, or `human_if_above_threshold`
 - **Allowed Assets**: Type tokens and press Enter (e.g., `ETH`, `USDC`), or leave as `*` for all
 - **Allowed Chains**: Type chains and press Enter (e.g., `sepolia`, `base`), or leave as `*` for all
+- **Allowed Contracts**: Contract/recipient addresses the agent may target, or `*` for unrestricted
 - **Max per Tx**: Max wei per single transaction (0 = unlimited)
 - **Daily Limit**: Max total wei per day (0 = unlimited)
+- **Window Limit**: Rolling spend-window cap in wei (0 = unlimited)
+- **Window Seconds**: Rolling window size in seconds (0 = disabled)
 - **Rate Limit**: Requests per minute (0 = server default)
 
 Click **Create Agent & Generate Key**.
@@ -137,10 +152,18 @@ POST /api-users
 ```json
 {
   "name": "OpenClaw Agent",
+  "bot_type": "spot_trader",
+  "bot_goal": "Automated spot trading on Sepolia testnet for demo purposes",
+  "telegram_chat_id": "",
+  "approval_mode": "human_if_above_threshold",
+  "approval_threshold_wei": "100000000000000000",
   "allowed_assets": ["ETH", "USDC"],
   "allowed_chains": ["sepolia", "base"],
+  "allowed_contracts": ["*"],
   "max_amount_wei": "500000000000000000",
   "daily_limit_wei": "2000000000000000000",
+  "window_limit_wei": "1000000000000000000",
+  "window_seconds": 3600,
   "rate_limit": 30
 }
 ```
@@ -150,12 +173,20 @@ POST /api-users
 {
   "id": "a1b2c3d4e5f67890",
   "name": "OpenClaw Agent",
+  "bot_type": "spot_trader",
+  "bot_goal": "Automated spot trading on Sepolia testnet for demo purposes",
   "api_key": "csp_aBcDeFgHiJkLmNoPqRsTuVwXyZ123456789",
   "api_key_prefix": "csp_aBcDeFgH",
+  "telegram_chat_id_set": false,
+  "approval_mode": "human_if_above_threshold",
+  "approval_threshold_wei": "100000000000000000",
   "allowed_assets": ["ETH", "USDC"],
   "allowed_chains": ["sepolia", "base"],
+  "allowed_contracts": ["*"],
   "max_amount_wei": "500000000000000000",
   "daily_limit_wei": "2000000000000000000",
+  "window_limit_wei": "1000000000000000000",
+  "window_seconds": 3600,
   "rate_limit": 30,
   "is_active": true,
   "created_at": "2026-03-05T10:00:00+00:00",
@@ -236,13 +267,16 @@ GET /api-users/{user_id}/usage
 
 ## Permission Matrix
 
-| Permission       | Setting               | `"0"` / `["*"]` means | Enforcement point    |
-| ---------------- | --------------------- | ---------------------- | -------------------- |
-| Token allowlist  | `allowed_assets`      | All tokens allowed     | `POST /intent`       |
-| Chain allowlist  | `allowed_chains`      | All chains allowed     | `POST /intent`       |
-| Per-tx max       | `max_amount_wei`      | No per-tx limit        | `POST /intent`       |
-| Daily cap        | `daily_limit_wei`     | No daily cap           | `POST /intent`       |
-| Rate limit       | `rate_limit`          | Server default (60/min)| Middleware (planned)  |
+| Permission         | Setting                    | `"0"` / `["*"]` means | Enforcement point    |
+| ------------------ | -------------------------- | ---------------------- | -------------------- |
+| Token allowlist    | `allowed_assets`           | All tokens allowed     | `POST /intent`       |
+| Chain allowlist    | `allowed_chains`           | All chains allowed     | `POST /intent`       |
+| Contract allowlist | `allowed_contracts`        | All addresses allowed  | `POST /intent`       |
+| Per-tx max         | `max_amount_wei`           | No per-tx limit        | `POST /intent`       |
+| Daily cap          | `daily_limit_wei`          | No daily cap           | `POST /intent`       |
+| Rolling window     | `window_limit_wei` / `window_seconds` | No window cap | `POST /intent`  |
+| Approval mode      | `approval_mode`            | `always_human` (default) | Signer auth flow   |
+| Rate limit         | `rate_limit`               | Server default (60/min)| Middleware (planned)  |
 
 ### Error examples
 
@@ -285,22 +319,30 @@ GET /api-users/{user_id}/usage
 
 ## Database Schema
 
-Two tables are added to the publisher_service SQLite database:
+Three tables are added to the publisher_service SQLite database:
 
 ```sql
 CREATE TABLE api_users (
-    id              TEXT PRIMARY KEY,
-    name            TEXT NOT NULL,
-    api_key_hash    TEXT NOT NULL UNIQUE,
-    api_key_prefix  TEXT NOT NULL,
-    allowed_assets  TEXT NOT NULL DEFAULT '["*"]',   -- JSON array
-    allowed_chains  TEXT NOT NULL DEFAULT '["*"]',   -- JSON array
-    max_amount_wei  TEXT NOT NULL DEFAULT '0',
-    daily_limit_wei TEXT NOT NULL DEFAULT '0',
-    rate_limit      INTEGER NOT NULL DEFAULT 0,
-    is_active       INTEGER NOT NULL DEFAULT 1,
-    created_at      TEXT NOT NULL,
-    updated_at      TEXT NOT NULL
+    id                      TEXT PRIMARY KEY,
+    name                    TEXT NOT NULL,
+    api_key_hash            TEXT NOT NULL UNIQUE,
+    api_key_prefix          TEXT NOT NULL,
+    telegram_chat_id        TEXT NOT NULL DEFAULT '',
+    bot_type                TEXT NOT NULL DEFAULT 'personal',
+    bot_goal                TEXT NOT NULL DEFAULT '',
+    allowed_assets          TEXT NOT NULL DEFAULT '["*"]',   -- JSON array
+    allowed_chains          TEXT NOT NULL DEFAULT '["*"]',   -- JSON array
+    allowed_contracts       TEXT NOT NULL DEFAULT '["*"]',   -- JSON array
+    max_amount_wei          TEXT NOT NULL DEFAULT '0',
+    daily_limit_wei         TEXT NOT NULL DEFAULT '0',
+    rate_limit              INTEGER NOT NULL DEFAULT 0,
+    approval_mode           TEXT NOT NULL DEFAULT 'always_human',
+    approval_threshold_wei  TEXT NOT NULL DEFAULT '0',
+    window_limit_wei        TEXT NOT NULL DEFAULT '0',
+    window_seconds          INTEGER NOT NULL DEFAULT 0,
+    is_active               INTEGER NOT NULL DEFAULT 1,
+    created_at              TEXT NOT NULL,
+    updated_at              TEXT NOT NULL
 );
 
 CREATE TABLE api_user_daily_usage (
@@ -311,6 +353,17 @@ CREATE TABLE api_user_daily_usage (
     PRIMARY KEY (user_id, date_utc),
     FOREIGN KEY (user_id) REFERENCES api_users(id)
 );
+
+CREATE TABLE api_user_usage_events (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id         TEXT NOT NULL,
+    amount_wei      TEXT NOT NULL DEFAULT '0',
+    created_at      TEXT NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES api_users(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_usage_events_user_time
+    ON api_user_usage_events(user_id, created_at);
 ```
 
 ---
@@ -327,6 +380,61 @@ The management UI is at `/dashboard/api-users` and provides:
 - **Edit modal**: Quick-edit all permissions for any agent
 
 The dashboard uses the same visual theme as the main transaction dashboard.
+
+---
+
+## AI-Powered Policy & Instruction Endpoints
+
+These endpoints use the **Z.AI GLM** language model. They require the
+`ZAI_API_KEY` environment variable to be set.
+
+### Generate Policy Suggestion
+
+```
+POST /api-users/generate-policy
+```
+
+Uses Z.AI to recommend permission settings based on the bot's type and goal.
+
+**Request:**
+```json
+{
+  "bot_goal": "Automated DCA into ETH every Monday at noon",
+  "bot_type": "dca_trader",
+  "allowed_assets": ["ETH"],
+  "allowed_chains": ["sepolia"]
+}
+```
+
+**Response (200):** A `GeneratePolicyResponse` with recommended `approval_mode`,
+thresholds, limits, reasoning, and summary. Pre-fills the create-agent form.
+
+### Policy Chat
+
+```
+POST /api-users/policy-chat
+```
+
+Multi-turn conversation with Z.AI to iteratively configure agent policy.
+Accepts `messages` (conversation history) and `user_message`.
+Returns either a text message or a draft policy object.
+
+### Agent Instruction Chat
+
+```
+POST /agent-instruction
+```
+
+**Requires an agent key.** The agent sends a natural-language instruction
+(e.g., "Send 0.01 ETH to alice.eth") and Z.AI reasons about it with injected
+context (wallet balances, recent trades, agent policy). Returns either a
+follow-up message or a structured `TransactionPlan`.
+
+```
+GET /agent-instruction/greeting
+```
+
+Returns a greeting message for the instruction chat panel.
 
 ---
 

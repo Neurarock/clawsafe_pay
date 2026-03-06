@@ -275,7 +275,7 @@ app.add_middleware(
 # ── Rate-limit middleware ────────────────────────────────────────────────────
 
 _rate_limit_store: dict[str, list[float]] = {}
-RATE_LIMIT_MAX = 60
+RATE_LIMIT_MAX = 300   # raised from 60 — dashboard frontend polls many endpoints from one IP
 RATE_LIMIT_WINDOW = 60.0
 
 

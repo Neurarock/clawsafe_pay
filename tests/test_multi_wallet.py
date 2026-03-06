@@ -254,7 +254,7 @@ class TestPublisherWalletsAPI:
     def _make_agent_key(self, client):
         resp = client.post(
             "/api-users",
-            json={"name": "mw-agent", "allowed_assets": ["*"], "allowed_chains": ["*"]},
+            json={"name": "mw-agent", "bot_goal": "Multi-wallet test agent", "allowed_assets": ["*"], "allowed_chains": ["*"]},
             headers={"X-API-Key": "test-key"},
         )
         assert resp.status_code == 201
