@@ -50,6 +50,12 @@ POLICY_TIP_WEI: int = int(os.getenv("POLICY_TIP_WEI", "1500000000"))
 SIGNER_POLL_INTERVAL_SECONDS: float = float(os.getenv("SIGNER_POLL_INTERVAL_SECONDS", "3"))
 SIGNER_POLL_TIMEOUT_SECONDS: float = float(os.getenv("SIGNER_POLL_TIMEOUT_SECONDS", "360"))
 
+# ── Z.AI (policy generation) ─────────────────────────────────────────────────
+ZAI_API_KEY: str = os.getenv("ZAI_API_KEY", "")
+ZAI_API_BASE: str = os.getenv("ZAI_API_BASE", "https://api.z.ai/api/paas/v4")
+ZAI_MODEL: str = os.getenv("ZAI_MODEL", "glm-5")
+ZAI_TIMEOUT_SECONDS: float = float(os.getenv("ZAI_TIMEOUT_SECONDS", "30"))
+
 # ── Flock API (injection filter) ─────────────────────────────────────────────
 FLOCK_API_KEY: str = os.getenv("FLOCK_API_KEY", "")
 FLOCK_MODEL: str = os.getenv("FLOCK_MODEL", "gemini-3-flash-preview")

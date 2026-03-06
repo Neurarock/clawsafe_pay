@@ -6,8 +6,8 @@
 
 import { API, API_KEY, DEFAULT_AGENT_KEY, CHAINS, state } from './state.js';
 import {
-  esc, toast, weiToDisplay, weiToEth, shortAddr, shortHash,
-  timeAgo, chainBadge, explorerLink, statusBadge, animStat,
+  esc, toast, weiToDisplay, weiToEth, shortAddr,
+  timeAgo, explorerLink, statusBadge, animStat, txTypeBadge, riskBadge, trustBadge,
 } from './utils.js';
 
 // ── Filtering ────────────────────────────────────────────────────────
@@ -19,14 +19,42 @@ export function setFilter(f, btn) {
 }
 
 function filterData(data) {
-  if (state.filter === 'all') return data;
+  let out = data;
+  if (state.agentFilter && state.agentFilter !== 'all') {
+    out = out.filter(d => {
+      const n = (d.api_user_name || (d.api_user_id ? 'Unknown Agent' : 'Admin Dashboard')).toLowerCase();
+      return n === state.agentFilter.toLowerCase();
+    });
+  }
+  if (state.filter === 'all') return out;
   const active  = ['pending', 'building', 'reviewing', 'signing', 'pending_auth', 'approved', 'broadcast'];
   const done    = ['confirmed'];
   const fail    = ['failed', 'rejected', 'expired', 'blocked', 'sign_failed'];
-  if (state.filter === 'active') return data.filter(d => active.includes(d.status));
-  if (state.filter === 'done')   return data.filter(d => done.includes(d.status));
-  if (state.filter === 'failed') return data.filter(d => fail.includes(d.status));
-  return data;
+  if (state.filter === 'active') return out.filter(d => active.includes(d.status));
+  if (state.filter === 'review') return out.filter(d => (d.policy_decision || '') === 'needs_review');
+  if (state.filter === 'high_risk') return out.filter(d => ['high', 'critical'].includes((d.risk_level || '').toLowerCase()));
+  if (state.filter === 'unknown') return out.filter(d => (d.trust_level || '').toLowerCase() === 'new');
+  if (state.filter === 'done')   return out.filter(d => done.includes(d.status));
+  if (state.filter === 'failed') return out.filter(d => fail.includes(d.status));
+  return out;
+}
+
+function renderAgentFilterOptions() {
+  const el = document.getElementById('tx-agent-filter');
+  if (!el) return;
+  const names = new Set(['Admin Dashboard']);
+  state.agents.forEach(a => names.add(a.name));
+  state.intents.forEach(i => {
+    const n = i.api_user_name || (i.api_user_id ? 'Unknown Agent' : 'Admin Dashboard');
+    if (n) names.add(n);
+  });
+  const current = state.agentFilter || 'all';
+  const opts = ['<option value="all">All Agents</option>'];
+  [...names].sort((a, b) => a.localeCompare(b)).forEach(n => {
+    const selected = current.toLowerCase() === n.toLowerCase() ? ' selected' : '';
+    opts.push(`<option value="${esc(n)}"${selected}>${esc(n)}</option>`);
+  });
+  el.innerHTML = opts.join('');
 }
 
 // ── Fetch ────────────────────────────────────────────────────────────
@@ -35,6 +63,7 @@ export async function fetchIntents() {
     const r = await fetch(`${API}/intents`, { headers: { 'X-API-Key': API_KEY } });
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     state.intents = await r.json();
+    renderAgentFilterOptions();
     renderTxTable();
     renderTxStats();
     renderTimeline();
@@ -107,24 +136,52 @@ export function renderTxTable() {
   document.getElementById('txEmpty').style.display = filtered.length ? 'none' : 'block';
 
   body.innerHTML = filtered.map(d => {
-    const chain   = d.chain || 'sepolia';
     const isNew   = !state.prevStatuses[d.intent_id];
     const changed = state.prevStatuses[d.intent_id] && state.prevStatuses[d.intent_id] !== d.status;
     state.prevStatuses[d.intent_id] = d.status;
     const cls = isNew ? 'row-enter' : (changed ? 'status-update' : '');
     const err = d.error_message
       ? `<div class="error-text" title="${esc(d.error_message)}">\u26A0 ${esc(d.error_message)}</div>`
+      : '<div><strong>Error:</strong> —</div>';
+    const purpose = d.tx_purpose || d.note || `${d.from_user} -> ${d.to_user}`;
+    const agentName = d.api_user_name || (d.api_user_id ? 'Unknown Agent' : 'Admin Dashboard');
+    const reasons = d.risk_reasons || [];
+    const detailId = `txd-${d.intent_id}`;
+    const reasonsLine = reasons.length
+      ? `<div class="note-text" title="${esc(reasons.join(', '))}">${esc(reasons.join(' · '))}</div>`
       : '';
-    return `<tr class="${cls}">
-      <td>${chainBadge(chain)}</td>
-      <td>${statusBadge(d.status)}${err}</td>
-      <td><strong>${esc(d.from_user)}</strong> \u2192 <strong>${esc(d.to_user)}</strong></td>
-      <td class="addr">${shortAddr(d.to_address)}</td>
-      <td class="amount">${weiToDisplay(d.amount_wei, chain)}</td>
-      <td class="note-text" title="${esc(d.note || '')}">${esc(d.note) || '\u2014'}</td>
-      <td>${explorerLink(d.tx_hash, chain)}</td>
-      <td class="time-ago">${timeAgo(d.created_at)}</td>
+    const detailRow = `<tr class="tx-detail-row" id="${detailId}" style="display:none">
+      <td colspan="9">
+        <div class="tx-detail-grid">
+          <div><strong>Agent:</strong> ${esc(agentName)}</div>
+          <div><strong>Policy:</strong> ${esc(d.policy_decision || 'auto_allowed')}</div>
+          <div><strong>Requires Human:</strong> ${(d.requires_human ? 'yes' : 'no')}</div>
+          <div><strong>Recipient:</strong> <span class="mono">${esc(d.to_address || '')}</span></div>
+          <div><strong>Reason Codes:</strong> ${esc((d.risk_reasons || []).join(', ') || 'none')}</div>
+          <div><strong>Note:</strong> ${esc(d.note || '—')}</div>
+          <div style="grid-column:1/-1"><strong>Error:</strong> ${err.replace(/<\/?div[^>]*>/g, '')}</div>
+        </div>
+      </td>
     </tr>`;
+    return `<tr class="${cls}">
+      <td>${txTypeBadge(d.tx_type)}</td>
+      <td><span class="badge badge-chain">${esc(agentName)}</span></td>
+      <td>
+        <div><strong>${esc(purpose)}</strong></div>
+        <div class="note-text">${esc(d.from_user)} \u2192 ${esc(d.to_user)} · ${esc(d.chain || 'sepolia')}</div>
+        ${reasonsLine}
+        <button class="tx-detail-toggle" onclick="toggleTxDetail('${detailId}', this)">Details</button>
+      </td>
+      <td>${riskBadge(d.risk_level, reasons)}</td>
+      <td>
+        ${trustBadge(d.trust_level)}
+        <div class="note-text" title="${esc(d.to_address || '')}">${shortAddr(d.to_address)}</div>
+      </td>
+      <td class="amount">${weiToDisplay(d.amount_wei, d.chain || 'sepolia')}</td>
+      <td>${statusBadge(d.status)}</td>
+      <td>${explorerLink(d.tx_hash, d.chain || 'sepolia')}</td>
+      <td class="time-ago">${timeAgo(d.created_at)}</td>
+    </tr>${detailRow}`;
   }).join('');
 }
 
@@ -263,3 +320,14 @@ export function toggleTxKeyVisibility() {
   }
 }
 window.toggleTxKeyVisibility = toggleTxKeyVisibility;
+window.setAgentFilter = (name) => {
+  state.agentFilter = name || 'all';
+  renderTxTable();
+};
+window.toggleTxDetail = (id, btn) => {
+  const row = document.getElementById(id);
+  if (!row) return;
+  const isOpen = row.style.display !== 'none';
+  row.style.display = isOpen ? 'none' : 'table-row';
+  if (btn) btn.textContent = isOpen ? 'Details' : 'Hide';
+};

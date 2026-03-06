@@ -98,7 +98,7 @@ async def publisher_proxy(path: str, request: Request):
     body = await request.body()
 
     try:
-        async with httpx.AsyncClient(timeout=20.0, follow_redirects=True) as client:
+        async with httpx.AsyncClient(timeout=60.0, follow_redirects=True) as client:
             resp = await client.request(
                 request.method,
                 upstream,

@@ -31,18 +31,23 @@ function renderBudgetTracker() {
 
   agents.forEach(agent => {
     const intents        = state.agentIntents[agent.id] || [];
+    const usage          = state.agentUsage[agent.id] || null;
     const todayConfirmed = intents.filter(i =>
       i.status === 'confirmed' && i.created_at && i.created_at.slice(0, 10) === today
     );
-    const todaySpend = todayConfirmed.reduce((s, i) => s + weiToEth(i.amount_wei || '0'), 0);
+    const todaySpendByIntents = todayConfirmed.reduce((s, i) => s + weiToEth(i.amount_wei || '0'), 0);
+    const todaySpendByUsage = usage ? weiToEth(usage.today_total_wei || '0') : 0;
+    const todaySpend = Math.max(todaySpendByIntents, todaySpendByUsage);
     const totalSpend = intents
       .filter(i => i.status === 'confirmed')
       .reduce((s, i) => s + weiToEth(i.amount_wei || '0'), 0);
 
     const hasBudget   = agent.daily_limit_wei !== '0';
     const dailyBudget = hasBudget ? weiToEth(agent.daily_limit_wei) : 0;
-    const pct         = hasBudget ? (todaySpend / dailyBudget) * 100 : 0;
+    const effectiveSpend = (todaySpend === 0 && totalSpend > 0) ? totalSpend : todaySpend;
+    const pct         = hasBudget ? (effectiveSpend / dailyBudget) * 100 : 0;
     const pctDisplay  = hasBudget ? Math.min(pct, 999).toFixed(1) : '\u2014';
+    const usingHistorical = todaySpend === 0 && totalSpend > 0;
 
     let barClass = 'ok', pctColor = 'var(--green)';
     if (pct > 100)     { barClass = 'over';   pctColor = 'var(--red)'; }
@@ -63,7 +68,7 @@ function renderBudgetTracker() {
       ${hasBudget
         ? `<div class="budget-bar"><div class="budget-bar-fill ${barClass}" style="width:${Math.min(pct, 100)}%"></div></div>`
         : `<div class="budget-bar"><div class="budget-bar-fill ok" style="width:0%"></div></div>`}
-      <div class="budget-bar-detail">Today: ${todaySpend.toFixed(4)} ETH${hasBudget ? ' / ' + dailyBudget.toFixed(4) + ' ETH limit' : ''} \u00B7 All-time: ${totalSpend.toFixed(4)} ETH \u00B7 ${intents.length} txns</div>
+      <div class="budget-bar-detail">${usingHistorical ? 'Historical' : 'Today'}: ${effectiveSpend.toFixed(4)} ETH${hasBudget ? ' / ' + dailyBudget.toFixed(4) + ' ETH limit' : ''} \u00B7 All-time: ${totalSpend.toFixed(4)} ETH \u00B7 ${intents.length} txns</div>
     </div>`;
   });
 

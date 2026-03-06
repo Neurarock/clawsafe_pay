@@ -86,6 +86,22 @@ export function statusBadge(status) {
   return `<span class="status-badge status-${status}">${inner}${status.replace(/_/g, ' ')}</span>`;
 }
 
+export function txTypeBadge(txType) {
+  const t = (txType || 'transfer').toLowerCase();
+  return `<span class="tx-badge tx-type tx-type-${t}">${t.replace(/_/g, ' ')}</span>`;
+}
+
+export function riskBadge(risk, reasons = []) {
+  const r = (risk || 'low').toLowerCase();
+  const title = reasons.length ? ` title="${esc(reasons.join(', '))}"` : '';
+  return `<span class="tx-badge tx-risk tx-risk-${r}"${title}>${r}</span>`;
+}
+
+export function trustBadge(trust) {
+  const t = (trust || 'known').toLowerCase();
+  return `<span class="tx-badge tx-trust tx-trust-${t}">${t}</span>`;
+}
+
 // ── Animated Stat Counter ────────────────────────────────────────────
 export function animStat(id, val) {
   const el = document.getElementById(id);

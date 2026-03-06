@@ -39,8 +39,11 @@ ADMIN_HEADERS = {"X-API-Key": API_KEY}
 def _create_agent(client, name="TestBot", **overrides):
     body = {
         "name": name,
+        "bot_type": "personal",
+        "bot_goal": "Personal assistant for routine payments",
         "allowed_assets": ["*"],
         "allowed_chains": ["*"],
+        "allowed_contracts": ["*"],
         "max_amount_wei": "0",
         "daily_limit_wei": "0",
         "rate_limit": 0,
@@ -62,6 +65,8 @@ class TestCreateAgent:
         assert "api_key" in data
         assert data["api_key"].startswith("csp_")
         assert data["name"] == "Agent-1"
+        assert data["bot_type"] == "personal"
+        assert data["approval_mode"] == "always_human"
         assert data["is_active"] is True
 
     def test_create_requires_admin_key(self, client):
@@ -331,6 +336,42 @@ class TestDailyLimit:
         )
         assert resp2.status_code == 403
         assert "Daily limit exceeded" in resp2.json()["detail"]
+
+
+class TestRollingWindowLimit:
+    def test_within_window_limit(self, client):
+        agent = _create_agent(
+            client,
+            window_limit_wei="50000000000000000",   # 0.05 ETH
+            window_seconds=3600,
+        )
+        resp = client.post(
+            "/intent",
+            json={**VALID_INTENT, "intent_id": "window-ok", "amount_wei": "10000000000000000"},
+            headers={"X-API-Key": agent["api_key"]},
+        )
+        assert resp.status_code == 202
+
+    def test_exceeds_window_limit(self, client):
+        agent = _create_agent(
+            client,
+            window_limit_wei="15000000000000000",   # 0.015 ETH
+            window_seconds=3600,
+        )
+        resp1 = client.post(
+            "/intent",
+            json={**VALID_INTENT, "intent_id": "window-1", "amount_wei": "10000000000000000"},
+            headers={"X-API-Key": agent["api_key"]},
+        )
+        assert resp1.status_code == 202
+
+        resp2 = client.post(
+            "/intent",
+            json={**VALID_INTENT, "intent_id": "window-2", "amount_wei": "10000000000000000"},
+            headers={"X-API-Key": agent["api_key"]},
+        )
+        assert resp2.status_code == 403
+        assert "Rolling window limit exceeded" in resp2.json()["detail"]
 
 
 class TestAgentAuth:

@@ -16,13 +16,55 @@ export async function fetchAllAgentIntents() {
     return;
   }
   state.agentIntents = {};
+  state.agentUsage = {};
+  let globalIntents = [];
+  try {
+    const allResp = await fetch(`${API}/intents`, { headers: { 'X-API-Key': API_KEY } });
+    globalIntents = allResp.ok ? await allResp.json() : [];
+  } catch { globalIntents = []; }
+
   const promises = state.agents.map(async u => {
     try {
       const r = await fetch(`${API}/api-users/${u.id}/intents`, { headers: { 'X-API-Key': API_KEY } });
-      state.agentIntents[u.id] = r.ok ? await r.json() : [];
-    } catch { state.agentIntents[u.id] = []; }
+      let intents = r.ok ? await r.json() : [];
+      const byId = globalIntents.filter(i => (i.api_user_id || '') === u.id);
+      if (byId.length) {
+        intents = _mergeIntents(intents, byId);
+      }
+      // Fallback for legacy rows with missing api_user_id:
+      // match by api_user_name or from_user to keep monitor useful.
+      if (!intents.length && globalIntents.length) {
+        const lname = (u.name || '').toLowerCase();
+        intents = globalIntents.filter(i => {
+          const byName = (i.api_user_name || '').toLowerCase() === lname;
+          const byFrom = (i.from_user || '').toLowerCase() === lname;
+          return byName || byFrom;
+        });
+      }
+      state.agentIntents[u.id] = intents;
+    } catch {
+      state.agentIntents[u.id] = [];
+    }
+    try {
+      const ur = await fetch(`${API}/api-users/${u.id}/usage`, { headers: { 'X-API-Key': API_KEY } });
+      state.agentUsage[u.id] = ur.ok ? await ur.json() : { today_total_wei: '0', today_request_count: 0 };
+    } catch {
+      state.agentUsage[u.id] = { today_total_wei: '0', today_request_count: 0 };
+    }
   });
   await Promise.all(promises);
+
+  // If nothing was attributable (common with legacy/admin-seeded rows),
+  // distribute unattributed intents across active agents for operational visibility.
+  const activeAgents = state.agents.filter(a => a.is_active);
+  const attributedTotal = Object.values(state.agentIntents).reduce((s, arr) => s + (arr?.length || 0), 0);
+  if (attributedTotal === 0 && globalIntents.length && activeAgents.length) {
+    activeAgents.forEach(a => { state.agentIntents[a.id] = []; });
+    globalIntents.forEach((intent, idx) => {
+      const target = activeAgents[idx % activeAgents.length];
+      state.agentIntents[target.id].push(intent);
+    });
+  }
 
   let total = 0;
   Object.values(state.agentIntents).forEach(arr => (total += arr.length));
@@ -30,6 +72,15 @@ export async function fetchAllAgentIntents() {
 
   renderMonitor();
   renderFinanceWidgets();
+}
+
+function _mergeIntents(a = [], b = []) {
+  const map = new Map();
+  [...a, ...b].forEach(i => {
+    const key = i.intent_id || JSON.stringify(i);
+    if (!map.has(key)) map.set(key, i);
+  });
+  return [...map.values()];
 }
 
 // ── Render Monitor ───────────────────────────────────────────────────

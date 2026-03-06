@@ -117,3 +117,19 @@ def check_agent_permission(
                        f"Limit: {daily_limit} wei, used today: {usage['total_wei']} wei, "
                        f"remaining: {max(0, remaining)} wei.",
             )
+
+    # ── Rolling window spend check ───────────────────────────────────
+    window_limit = api_user.get("window_limit_wei", "0")
+    window_seconds = int(api_user.get("window_seconds", 0) or 0)
+    if window_limit and window_limit != "0" and window_seconds > 0:
+        from publisher_service.api_users_db import get_window_usage
+        usage = get_window_usage(api_user["id"], window_seconds)
+        projected = int(usage["total_wei"]) + int(amount_wei)
+        if projected > int(window_limit):
+            remaining = int(window_limit) - int(usage["total_wei"])
+            raise HTTPException(
+                status_code=403,
+                detail=f"Rolling window limit exceeded for agent '{api_user['name']}'. "
+                       f"Window: {window_seconds}s, limit: {window_limit} wei, "
+                       f"used in window: {usage['total_wei']} wei, remaining: {max(0, remaining)} wei.",
+            )

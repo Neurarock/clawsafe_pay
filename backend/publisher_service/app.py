@@ -13,6 +13,7 @@ import asyncio
 import json
 import logging
 from contextlib import asynccontextmanager
+from typing import Any
 
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
@@ -37,7 +38,12 @@ from publisher_service.api_user_models import (
     ApiUserCreatedResponse,
     ApiKeyRegeneratedResponse,
     ApiUserUsageResponse,
+    GeneratePolicyRequest,
+    GeneratePolicyResponse,
+    PolicyChatRequest,
+    PolicyChatResponse,
 )
+import publisher_service.zai_policy_client as zai_policy_client
 from publisher_service.wallet_models import (
     AddWallet,
     WalletResponse,
@@ -49,6 +55,171 @@ logging.basicConfig(
     format="%(asctime)s [%(name)s] %(levelname)s  %(message)s",
 )
 logger = logging.getLogger("publisher_service.app")
+
+FAIL_STATUSES = {"failed", "rejected", "expired", "blocked", "sign_failed"}
+
+
+def _infer_tx_type(note: str) -> str:
+    n = (note or "").lower()
+    if any(k in n for k in ("swap", "dex", "uniswap", "sushiswap", "curve")):
+        return "swap"
+    if any(k in n for k in ("approve", "allowance")):
+        return "approval"
+    if "bridge" in n:
+        return "bridge"
+    if "repay" in n:
+        return "repay"
+    if any(k in n for k in ("borrow", "loan")):
+        return "borrow"
+    if "nft" in n and any(k in n for k in ("buy", "mint", "snipe")):
+        return "nft_buy"
+    if "nft" in n and any(k in n for k in ("sell", "list")):
+        return "nft_sell"
+    if any(k in n for k in ("contract", "call", "execute")):
+        return "contract_call"
+    return "transfer"
+
+
+def _is_prepopulated_demo_row(row: dict[str, Any]) -> bool:
+    note = (row.get("note") or "").strip().lower()
+    intent_id = (row.get("intent_id") or "").strip().lower()
+    demo_notes = {
+        "dashboard demo tx",
+        "dashboard demo transaction",
+        "manual dashboard transfer",
+        "known user transfer",
+        "call demo",
+        "demo call",
+        "demo payment request",
+    }
+    return note in demo_notes or intent_id.startswith("dash-")
+
+
+def _derive_trust_level(*, to_address: str, status: str, seen_before: bool) -> str:
+    allow = [a.lower() for a in config.POLICY_RECIPIENT_ALLOWLIST]
+    addr = (to_address or "").lower()
+    has_explicit_allow = "*" not in allow
+    if status == "blocked":
+        return "blocked"
+    if has_explicit_allow and addr in allow:
+        return "whitelisted"
+    if seen_before:
+        return "known"
+    return "new"
+
+
+def _derive_risk_and_reasons(*, status: str, trust: str, amount_wei: str, tx_type: str) -> tuple[str, list[str]]:
+    reasons: list[str] = []
+    risk = "low"
+    if status in FAIL_STATUSES:
+        risk = "high"
+        reasons.append("terminal_status")
+    if trust == "blocked":
+        risk = "high"
+        reasons.append("blocked_recipient")
+    elif trust == "new":
+        if risk == "low":
+            risk = "medium"
+        reasons.append("new_recipient")
+    if status in {"pending_auth", "approved", "signing"}:
+        if risk == "low":
+            risk = "medium"
+        reasons.append("awaiting_authorization")
+    try:
+        amount = int(amount_wei or "0")
+    except (ValueError, TypeError):
+        amount = 0
+    if amount > 1_000_000_000_000_000_000:  # > 1 ETH
+        risk = "high"
+        reasons.append("large_amount")
+    elif amount > 100_000_000_000_000_000 and risk == "low":  # > 0.1 ETH
+        risk = "medium"
+        reasons.append("elevated_amount")
+    if tx_type in {"borrow", "nft_buy", "nft_sell", "contract_call", "bridge"} and risk == "low":
+        risk = "medium"
+        reasons.append("complex_tx_type")
+    return risk, reasons
+
+
+def _build_tx_metadata(row: dict[str, Any], *, seen_before: bool) -> dict[str, Any]:
+    if row.get("tx_type") and row.get("tx_purpose") and row.get("risk_level") and row.get("trust_level"):
+        reasons = row.get("risk_reasons")
+        if reasons is None and row.get("risk_reasons_json"):
+            try:
+                reasons = json.loads(row.get("risk_reasons_json", "[]"))
+            except json.JSONDecodeError:
+                reasons = []
+        if reasons is None:
+            reasons = []
+        return {
+            "tx_type": row.get("tx_type", "transfer"),
+            "tx_purpose": row.get("tx_purpose", ""),
+            "risk_level": row.get("risk_level", "low"),
+            "risk_reasons": reasons,
+            "trust_level": row.get("trust_level", "new"),
+            "policy_decision": row.get("policy_decision", "needs_review"),
+            "requires_human": bool(row.get("requires_human", True)),
+        }
+
+    tx_type = _infer_tx_type(row.get("note", ""))
+    if _is_prepopulated_demo_row(row):
+        purpose = (row.get("note") or "").strip()
+        if purpose.lower() in {"dashboard demo tx", "dashboard demo transaction", "manual dashboard transfer"}:
+            purpose = "Known user transfer"
+        elif purpose.lower() in {"call demo", "demo call"}:
+            purpose = "Demo payment request"
+        if not purpose:
+            purpose = f"{row.get('from_user', 'agent')} -> {row.get('to_user', 'recipient')}"
+        return {
+            "tx_type": tx_type,
+            "tx_purpose": purpose,
+            "risk_level": "low",
+            "risk_reasons": [],
+            "trust_level": "known",
+            "policy_decision": "auto_allowed",
+            "requires_human": False,
+        }
+
+    trust_level = _derive_trust_level(
+        to_address=row.get("to_address", ""),
+        status=row.get("status", ""),
+        seen_before=seen_before,
+    )
+    risk_level, reason_codes = _derive_risk_and_reasons(
+        status=row.get("status", ""),
+        trust=trust_level,
+        amount_wei=row.get("amount_wei", "0"),
+        tx_type=tx_type,
+    )
+    policy_decision = "auto_allowed"
+    if row.get("status") == "blocked":
+        policy_decision = "blocked"
+    elif risk_level in {"medium", "high"} or trust_level == "new":
+        policy_decision = "needs_review"
+
+    purpose = (row.get("note") or "").strip()
+    if purpose.lower() in {"dashboard demo tx", "dashboard demo transaction", "manual dashboard transfer"}:
+        purpose = "Known user transfer"
+    elif purpose.lower() in {"call demo", "demo call"}:
+        purpose = "Demo payment request"
+    if not purpose:
+        purpose = f"{row.get('from_user', 'agent')} -> {row.get('to_user', 'recipient')}"
+
+    return {
+        "tx_type": tx_type,
+        "tx_purpose": purpose,
+        "risk_level": risk_level,
+        "risk_reasons": reason_codes,
+        "trust_level": trust_level,
+        "policy_decision": policy_decision,
+        "requires_human": policy_decision != "auto_allowed",
+    }
+
+
+def _resolve_api_user_name(api_user_id: str, user_map: dict[str, str]) -> str:
+    if not api_user_id:
+        return "Admin Dashboard"
+    return user_map.get(api_user_id, "Unknown Agent")
 
 
 @asynccontextmanager
@@ -246,8 +417,17 @@ async def get_intent_status(intent_id: str):
 async def list_intents():
     """Return all intents ordered by created_at desc (for the dashboard)."""
     rows = db.list_intents()
+    user_map = {u["id"]: u["name"] for u in api_users_db.list_api_users()}
+    seen_recipients: set[str] = set()
+    seen_before_by_id: dict[str, bool] = {}
+    for row in reversed(rows):
+        addr = (row.get("to_address") or "").lower()
+        seen_before_by_id[row["intent_id"]] = addr in seen_recipients
+        seen_recipients.add(addr)
+
     results = []
     for row in rows:
+        meta = _build_tx_metadata(row, seen_before=seen_before_by_id.get(row["intent_id"], False))
         results.append({
             "intent_id": row["intent_id"],
             "status": row["status"],
@@ -262,8 +442,10 @@ async def list_intents():
             "tx_hash": row["tx_hash"],
             "error_message": row["error_message"],
             "api_user_id": row.get("api_user_id", ""),
+            "api_user_name": _resolve_api_user_name(row.get("api_user_id", ""), user_map),
             "created_at": row["created_at"],
             "updated_at": row["updated_at"],
+            **meta,
         })
     return results
 
@@ -391,18 +573,62 @@ async def wallet_balances():
 # ── API User Management (admin-only) ────────────────────────────────────────
 
 
+@app.post("/api-users/generate-policy", response_model=GeneratePolicyResponse,
+          dependencies=[Depends(require_admin_key)])
+async def generate_policy_endpoint(body: GeneratePolicyRequest):
+    """Use Z.AI GLM to suggest a policy for a new agent based on its goal."""
+    if not config.ZAI_API_KEY:
+        raise HTTPException(status_code=503, detail="ZAI_API_KEY is not configured on this server")
+    try:
+        result = await zai_policy_client.generate_policy(
+            bot_goal=body.bot_goal,
+            bot_type=body.bot_type,
+            allowed_assets=body.allowed_assets,
+            allowed_chains=body.allowed_chains,
+        )
+    except Exception as exc:
+        logger.error("Policy generation failed: %s", exc)
+        raise HTTPException(status_code=502, detail=f"Policy generation failed: {exc}")
+    logger.info("Generated policy via Z.AI model=%s", result.get("model_used"))
+    return GeneratePolicyResponse(**result)
+
+
+@app.post("/api-users/policy-chat", response_model=PolicyChatResponse,
+          dependencies=[Depends(require_admin_key)])
+async def policy_chat_endpoint(body: PolicyChatRequest):
+    """Multi-turn chat with Z.AI to configure a new agent. Returns a message or a completed draft."""
+    if not config.ZAI_API_KEY:
+        raise HTTPException(status_code=503, detail="ZAI_API_KEY is not configured on this server")
+    try:
+        result = await zai_policy_client.policy_chat(
+            messages=[m.model_dump() for m in body.messages],
+            user_message=body.user_message,
+        )
+    except Exception as exc:
+        logger.error("Policy chat failed: %s", exc)
+        raise HTTPException(status_code=502, detail=f"Policy chat failed: {exc}")
+    return PolicyChatResponse(**result)
+
+
 @app.post("/api-users", response_model=ApiUserCreatedResponse, status_code=201,
           dependencies=[Depends(require_admin_key)])
 async def create_api_user_endpoint(body: CreateApiUser):
     """Create a new API user (agent). Returns the API key — shown only once."""
     user = api_users_db.create_api_user(
         name=body.name,
+        bot_type=body.bot_type,
+        bot_goal=body.bot_goal,
+        telegram_chat_id=body.telegram_chat_id,
         allowed_assets=body.allowed_assets,
         allowed_chains=body.allowed_chains,
+        allowed_contracts=body.allowed_contracts,
         max_amount_wei=body.max_amount_wei,
         daily_limit_wei=body.daily_limit_wei,
         rate_limit=body.rate_limit,
-        telegram_chat_id=body.telegram_chat_id,
+        approval_mode=body.approval_mode,
+        approval_threshold_wei=body.approval_threshold_wei,
+        window_limit_wei=body.window_limit_wei,
+        window_seconds=body.window_seconds,
     )
     logger.info("Created API user %s (%s)", user["id"], user["name"])
     return user
@@ -433,11 +659,18 @@ async def update_api_user_endpoint(user_id: str, body: UpdateApiUser):
         user_id,
         name=body.name,
         telegram_chat_id=body.telegram_chat_id,
+        bot_type=body.bot_type,
+        bot_goal=body.bot_goal,
         allowed_assets=body.allowed_assets,
         allowed_chains=body.allowed_chains,
+        allowed_contracts=body.allowed_contracts,
         max_amount_wei=body.max_amount_wei,
         daily_limit_wei=body.daily_limit_wei,
         rate_limit=body.rate_limit,
+        approval_mode=body.approval_mode,
+        approval_threshold_wei=body.approval_threshold_wei,
+        window_limit_wei=body.window_limit_wei,
+        window_seconds=body.window_seconds,
         is_active=body.is_active,
     )
     if not updated:
@@ -496,8 +729,17 @@ async def list_agent_intents(user_id: str):
     if not user:
         raise HTTPException(status_code=404, detail="API user not found")
     rows = db.list_intents_by_agent(user_id)
+    agent_name = user.get("name", "Unknown Agent")
+    seen_recipients: set[str] = set()
+    seen_before_by_id: dict[str, bool] = {}
+    for row in reversed(rows):
+        addr = (row.get("to_address") or "").lower()
+        seen_before_by_id[row["intent_id"]] = addr in seen_recipients
+        seen_recipients.add(addr)
+
     results = []
     for row in rows:
+        meta = _build_tx_metadata(row, seen_before=seen_before_by_id.get(row["intent_id"], False))
         results.append({
             "intent_id": row["intent_id"],
             "status": row["status"],
@@ -511,7 +753,10 @@ async def list_agent_intents(user_id: str):
             "note": row["note"],
             "tx_hash": row["tx_hash"],
             "error_message": row["error_message"],
+            "api_user_id": row.get("api_user_id", user_id),
+            "api_user_name": agent_name,
             "created_at": row["created_at"],
             "updated_at": row["updated_at"],
+            **meta,
         })
     return results

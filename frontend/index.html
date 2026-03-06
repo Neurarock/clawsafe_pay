@@ -29,6 +29,7 @@
     <div class="hdr-right">
       <div class="sys-badge"><span class="sys-dot"></span><span id="activeChains">Sepolia · Base</span></div>
       <div class="hdr-clock" id="liveClock">00:00:00 UTC</div>
+      <button class="btn btn-sm btn-primary" onclick="showCreateAgentPage()" style="padding:6px 12px;font-size:11px">+ New Agent</button>
       <a href="/" class="hdr-link">Home Page</a>
       <a href="https://github.com/Neurarock/clawsafe_pay" target="_blank" rel="noopener" class="github-btn" title="View on GitHub"><svg viewBox="0 0 16 16"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>GitHub</a>
       <div class="theme-wrap">
@@ -67,8 +68,204 @@
     <div class="stat-card"><div class="stat-label">Agents</div><div class="stat-value cyan" id="s-agents">0</div><div class="stat-sub" id="s-agents-sub">&nbsp;</div></div>
   </div>
 
+  <!-- ═══ Create Agent Sub-Page ═══ -->
+  <div id="page-create-agent" style="display:none;padding:24px 20px">
+    <div style="max-width:680px;margin:0 auto">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px">
+        <button class="btn btn-outline" onclick="hideCreateAgentPage()" style="padding:6px 14px;font-size:12px">← Agents</button>
+        <div>
+          <h2 style="margin:0;font-size:17px;font-weight:600">🤖 New Agent</h2>
+          <p style="margin:2px 0 0;font-size:11px;color:var(--muted)">Configure your agent's identity, mission, and spending policy</p>
+        </div>
+      </div>
+
+      <div class="widget">
+        <div class="wb pad">
+          <form id="agentForm" autocomplete="off">
+            <div class="form-stack">
+
+              <!-- ── Identity ── -->
+              <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);padding-bottom:6px;border-bottom:1px solid rgba(255,255,255,.07)">Identity</div>
+
+              <div class="form-group">
+                <label>Agent Name</label>
+                <input type="text" id="ag-name" placeholder="e.g. ETH/USDC Spot Trader" required>
+              </div>
+              <div class="form-group">
+                <label>📱 Telegram Chat ID</label>
+                <input type="text" id="ag-telegram-chat-id" placeholder="e.g. 6807358958 or -5239918904">
+                <div class="form-hint" style="color:var(--muted)">Optional per-agent override. Leave empty to use the global default.</div>
+              </div>
+
+              <div class="form-group">
+                <label>Bot Type</label>
+                <select id="ag-bot-type">
+                  <option value="personal" selected>👤 Personal Assistant</option>
+                  <option value="ecommerce">🛒 E-Commerce Bot</option>
+                  <option value="spot_trader">📈 Spot Trader</option>
+                  <option value="dca_trader">🔄 DCA Trader</option>
+                  <option value="nft_sniper">🎯 NFT Sniper</option>
+                  <option value="pump_fun_sniper">🚀 Pump.fun Sniper</option>
+                  <option value="polymarket_copytrader">🔮 Polymarket Copy Trader</option>
+                  <option value="defi_borrower">🏦 DeFi Borrower</option>
+                  <option value="custom">⚙️ Custom</option>
+                </select>
+              </div>
+
+              <div style="display:flex;gap:8px;align-items:flex-end">
+                <div class="form-group" style="flex:1;margin:0">
+                  <label>Bot Goal <span style="color:var(--muted);font-weight:400;font-size:10px">— high-level mission statement</span></label>
+                  <input type="text" id="ag-bot-goal" placeholder="What is this agent trying to achieve?" required>
+                </div>
+                <button type="button" onclick="openPolicyChat()"
+                  class="btn btn-outline" style="white-space:nowrap;padding:7px 12px;font-size:11px;margin-bottom:0;border-color:rgba(6,182,212,.35);color:var(--cyan)">
+                  💬 Chat Setup
+                </button>
+                <button type="button" id="ag-generate-btn" onclick="generatePolicy('ag')"
+                  class="btn btn-outline" style="white-space:nowrap;padding:7px 12px;font-size:11px;margin-bottom:0">
+                  ✨ Generate
+                </button>
+              </div>
+
+              <!-- ── AI Policy Chat Panel ── -->
+              <div id="ag-chat-panel" style="display:none;border:1px solid rgba(6,182,212,.25);border-radius:10px;background:rgba(6,182,212,.04);margin:10px 0 4px;overflow:hidden">
+                <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid rgba(6,182,212,.15)">
+                  <span style="font-size:12px;font-weight:600;color:var(--cyan)">💬 AI Policy Setup</span>
+                  <button type="button" onclick="closePolicyChat()" style="background:none;border:none;color:var(--muted);font-size:14px;cursor:pointer;padding:0 2px;line-height:1">&times;</button>
+                </div>
+                <div id="ag-chat-messages" style="height:260px;overflow-y:auto;padding:12px 14px;display:flex;flex-direction:column"></div>
+                <div style="display:flex;gap:8px;padding:10px 14px;border-top:1px solid rgba(6,182,212,.15)">
+                  <input type="text" id="ag-chat-input" placeholder="Type your reply…"
+                    style="flex:1;font-size:12px"
+                    onkeydown="if(event.key==='Enter'){event.preventDefault();sendChatMessage();}">
+                  <button type="button" id="ag-chat-send" onclick="sendChatMessage()"
+                    class="btn btn-outline" style="white-space:nowrap;padding:6px 14px;font-size:11px;border-color:rgba(6,182,212,.35);color:var(--cyan)">
+                    Send
+                  </button>
+                </div>
+              </div>
+
+              <!-- ── Policy Preview Card ── -->
+              <div id="ag-policy-preview"></div>
+
+              <!-- ── Approval Policy ── -->
+              <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);padding-bottom:6px;border-bottom:1px solid rgba(255,255,255,.07);margin-top:4px">Spending Policy</div>
+
+              <div class="form-group">
+                <label>Approval Mode</label>
+                <select id="ag-approval-mode">
+                  <option value="always_human">Always Human</option>
+                  <option value="auto_within_limits">Auto Within Limits</option>
+                  <option value="human_if_above_threshold">Human Above Threshold</option>
+                </select>
+              </div>
+
+              <div class="form-row">
+                <div class="form-group">
+                  <label>Human Approval Threshold (wei)</label>
+                  <input type="text" id="ag-approval-threshold" placeholder="0 = always human" value="0">
+                  <div class="form-hint" id="ag-approval-threshold-hint" style="color:var(--cyan)"></div>
+                </div>
+                <div class="form-group">
+                  <label>Window Spend Cap (wei)</label>
+                  <input type="text" id="ag-window-limit" placeholder="0 = unlimited" value="0">
+                  <div class="form-hint" id="ag-window-limit-hint" style="color:var(--cyan)"></div>
+                </div>
+              </div>
+
+              <div class="form-row">
+                <div class="form-group">
+                  <label>Window Duration (seconds)</label>
+                  <input type="number" id="ag-window-seconds" placeholder="e.g. 3600" value="0" min="0">
+                  <div class="form-hint">0 = disabled · 3600 = 1 hr · 86400 = 1 day</div>
+                </div>
+                <div class="form-group">
+                  <label>Rate Limit (req/min)</label>
+                  <input type="number" id="ag-rate" placeholder="0 = default" value="0" min="0">
+                </div>
+              </div>
+
+              <div class="form-row">
+                <div class="form-group">
+                  <label>Max per Tx (wei)</label>
+                  <input type="text" id="ag-max-tx" placeholder="0 = unlimited" value="0">
+                  <div class="form-hint" id="ag-max-tx-hint" style="color:var(--cyan)"></div>
+                </div>
+                <div class="form-group">
+                  <label>Daily Limit (wei)</label>
+                  <input type="text" id="ag-daily" placeholder="0 = unlimited" value="0">
+                  <div class="form-hint" id="ag-daily-hint" style="color:var(--cyan)"></div>
+                </div>
+              </div>
+
+              <!-- ── Permissions ── -->
+              <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);padding-bottom:6px;border-bottom:1px solid rgba(255,255,255,.07);margin-top:4px">Permissions</div>
+
+              <div class="form-group">
+                <label>Allowed Assets</label>
+                <div class="selector-area" id="ag-assets-area">
+                  <div class="preset-row">
+                    <span class="preset-btn wild selected" data-val="*" onclick="togglePreset(this,'assets')">✱ ALL</span>
+                    <span class="preset-btn asset" data-val="ETH" onclick="togglePreset(this,'assets')">ETH</span>
+                    <span class="preset-btn asset" data-val="USDC" onclick="togglePreset(this,'assets')">USDC</span>
+                    <span class="preset-btn asset" data-val="USDT" onclick="togglePreset(this,'assets')">USDT</span>
+                    <span class="preset-btn asset" data-val="SOL" onclick="togglePreset(this,'assets')">SOL</span>
+                    <span class="preset-btn asset" data-val="BTC" onclick="togglePreset(this,'assets')">BTC</span>
+                  </div>
+                  <div class="custom-add-row">
+                    <input type="text" id="ag-assets-custom" placeholder="Custom asset…">
+                    <button type="button" onclick="addCustom('assets')">+ Add</button>
+                  </div>
+                  <div class="selected-display" id="ag-assets-display"></div>
+                </div>
+                <input type="hidden" id="ag-assets-val" value='["*"]'>
+              </div>
+
+              <div class="form-group">
+                <label>Allowed Chains</label>
+                <div class="selector-area" id="ag-chains-area">
+                  <div class="preset-row">
+                    <span class="preset-btn wild selected" data-val="*" onclick="togglePreset(this,'chains')">✱ ALL</span>
+                    <span class="preset-btn chain" data-val="sepolia" onclick="togglePreset(this,'chains')">Sepolia</span>
+                    <span class="preset-btn chain" data-val="base" onclick="togglePreset(this,'chains')">Base</span>
+                    <span class="preset-btn chain" data-val="solana" onclick="togglePreset(this,'chains')">Solana</span>
+                    <span class="preset-btn chain" data-val="bitcoin" onclick="togglePreset(this,'chains')">Bitcoin</span>
+                    <span class="preset-btn chain" data-val="cardano" onclick="togglePreset(this,'chains')">Cardano</span>
+                  </div>
+                  <div class="custom-add-row">
+                    <input type="text" id="ag-chains-custom" placeholder="Custom chain…">
+                    <button type="button" onclick="addCustom('chains')">+ Add</button>
+                  </div>
+                  <div class="selected-display" id="ag-chains-display"></div>
+                </div>
+                <input type="hidden" id="ag-chains-val" value='["*"]'>
+              </div>
+
+              <div class="form-group">
+                <label id="ag-contracts-label">Allowed Contracts / Addresses</label>
+                <div class="selector-area" id="ag-contracts-area">
+                  <div class="preset-row" id="ag-contracts-presets">
+                    <span class="preset-btn wild selected" data-val="*" onclick="toggleContract(this,'ag')">✱ ALL</span>
+                  </div>
+                  <div class="custom-add-row">
+                    <input type="text" id="ag-contracts-custom" placeholder="0x… contract or address" style="font-family:monospace;font-size:11px">
+                    <button type="button" onclick="addCustomContract('ag')">+ Add</button>
+                  </div>
+                  <div class="selected-display" id="ag-contracts-display"></div>
+                </div>
+                <input type="hidden" id="ag-contracts-val" value='["*"]'>
+              </div>
+
+              <button type="submit" class="btn btn-primary" style="width:100%;margin-top:8px" id="agCreateBtn">🔑 Create Agent</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- ═══ Dashboard Grid ═══ -->
-  <div class="dash-grid">
+  <div class="dash-grid" id="dash-grid">
 
     <!-- ── Left Column ── -->
     <div class="dash-col">
@@ -133,7 +330,7 @@
                 </div>
                 <div class="form-group">
                   <label>Note</label>
-                  <input type="text" id="tx-note" placeholder="Payment for..." value="Dashboard demo tx">
+                  <input type="text" id="tx-note" placeholder="Payment for..." value="Known user transfer">
                 </div>
               </div>
               <button type="submit" class="btn btn-primary" id="txBtn" style="width:100%;margin-top:2px">
@@ -145,98 +342,7 @@
         </div>
       </div>
 
-      <!-- ➕ Create Agent -->
-      <div class="widget" id="w-create-agent">
-        <div class="wh">
-          <div class="wt"><span class="wt-icon">➕</span> Create Agent</div>
-          <div class="wa"><button class="w-btn" onclick="toggleWidget(this)">−</button></div>
-        </div>
-        <div class="wb pad">
-          <form id="agentForm" autocomplete="off">
-            <div class="form-stack">
-              <!-- Beta Notice -->
-              <div style="background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.25);border-radius:8px;padding:10px 12px;margin-bottom:4px;font-size:11px;line-height:1.6;color:var(--muted)">
-                <strong style="color:var(--amber)">⚠️ BETA NOTICE</strong><br>
-                Only <strong style="color:var(--text)">Sepolia testnet</strong> wallets are available in this beta. The two default wallets are <strong style="color:var(--text)">shared between all users</strong> — be mindful of balance when testing. Do not send more than the wallet holds.<br>
-                <span style="color:var(--cyan)">Check wallet balances below before submitting transactions.</span>
-              </div>
-              <div class="form-group">
-                <label>Agent Name</label>
-                <input type="text" id="ag-name" placeholder="e.g. OpenClaw Agent" required>
-              </div>
-              <div class="form-group">
-                <label>📱 Telegram Chat ID</label>
-                <div style="position:relative">
-                  <input type="text" id="ag-telegram-chat-id" placeholder="e.g. 6807358958 or -5239918904">
-                </div>
-                <div class="form-hint" style="color:var(--muted);line-height:1.6">
-                  <strong>How to get your Telegram Chat ID:</strong><br>
-                  • <strong>Personal ID:</strong> Message <a href="https://t.me/userinfobot" target="_blank" rel="noopener" style="color:var(--cyan)">@userinfobot</a> on Telegram — it replies with your user ID (e.g. <code style="color:var(--cyan);background:rgba(6,182,212,.06);padding:1px 4px;border-radius:3px;font-size:10px">6807358958</code>).<br>
-                  • <strong>Group Chat ID:</strong> Add <a href="https://t.me/userinfobot" target="_blank" rel="noopener" style="color:var(--cyan)">@userinfobot</a> to your group — it posts the group chat ID (starts with <code style="color:var(--cyan);background:rgba(6,182,212,.06);padding:1px 4px;border-radius:3px;font-size:10px">-</code>).<br>
-                  • Leave empty to use the default system chat for auth prompts.
-                </div>
-              </div>
-              <div class="form-group">
-                <label>Allowed Assets</label>
-                <div class="selector-area" id="ag-assets-area">
-                  <div class="preset-row">
-                    <span class="preset-btn wild selected" data-val="*" onclick="togglePreset(this,'assets')">✱ ALL</span>
-                    <span class="preset-btn asset" data-val="ETH" onclick="togglePreset(this,'assets')">ETH</span>
-                    <span class="preset-btn asset" data-val="USDC" onclick="togglePreset(this,'assets')">USDC</span>
-                    <span class="preset-btn asset" data-val="USDT" onclick="togglePreset(this,'assets')">USDT</span>
-                    <span class="preset-btn asset" data-val="SOL" onclick="togglePreset(this,'assets')">SOL</span>
-                    <span class="preset-btn asset" data-val="BTC" onclick="togglePreset(this,'assets')">BTC</span>
-                  </div>
-                  <div class="custom-add-row">
-                    <input type="text" id="ag-assets-custom" placeholder="Custom asset…">
-                    <button type="button" onclick="addCustom('assets')">+ Add</button>
-                  </div>
-                  <div class="selected-display" id="ag-assets-display"></div>
-                </div>
-                <input type="hidden" id="ag-assets-val" value='["*"]'>
-              </div>
-              <div class="form-group">
-                <label>Allowed Chains</label>
-                <div class="selector-area" id="ag-chains-area">
-                  <div class="preset-row">
-                    <span class="preset-btn wild selected" data-val="*" onclick="togglePreset(this,'chains')">✱ ALL</span>
-                    <span class="preset-btn chain" data-val="sepolia" onclick="togglePreset(this,'chains')">Sepolia</span>
-                    <span class="preset-btn chain" data-val="base" onclick="togglePreset(this,'chains')">Base</span>
-                    <span class="preset-btn chain" data-val="solana" onclick="togglePreset(this,'chains')">Solana</span>
-                    <span class="preset-btn chain" data-val="bitcoin" onclick="togglePreset(this,'chains')">Bitcoin</span>
-                    <span class="preset-btn chain" data-val="cardano" onclick="togglePreset(this,'chains')">Cardano</span>
-                  </div>
-                  <div class="custom-add-row">
-                    <input type="text" id="ag-chains-custom" placeholder="Custom chain…">
-                    <button type="button" onclick="addCustom('chains')">+ Add</button>
-                  </div>
-                  <div class="selected-display" id="ag-chains-display"></div>
-                </div>
-                <input type="hidden" id="ag-chains-val" value='["*"]'>
-              </div>
-              <div class="form-row">
-                <div class="form-group">
-                  <label>Max per Tx (wei)</label>
-                  <input type="text" id="ag-max-tx" placeholder="0 = unlimited" value="0">
-                  <div class="form-hint">0 = no limit</div>
-                </div>
-                <div class="form-group">
-                  <label>Daily Limit (wei)</label>
-                  <input type="text" id="ag-daily" placeholder="0 = unlimited" value="0">
-                  <div class="form-hint">0 = no cap</div>
-                </div>
-              </div>
-              <div class="form-group">
-                <label>Rate Limit (req/min)</label>
-                <input type="number" id="ag-rate" placeholder="0 = default" value="0" min="0">
-              </div>
-              <button type="submit" class="btn btn-primary" style="width:100%" id="agCreateBtn">🔑 Create Agent</button>
-            </div>
-          </form>
-        </div>
-      </div>
-
-      <!-- � Wallet Management -->
+      <!-- 👛 Wallet Management -->
       <div class="widget" id="w-wallet-mgmt">
         <div class="wh">
           <div class="wt"><span class="wt-icon">👛</span> Wallet Management <span class="w-count" id="walletCount">0</span></div>
@@ -363,9 +469,15 @@
             <div class="tx-filters">
               <button class="f-btn active" onclick="setFilter('all',this)">All</button>
               <button class="f-btn" onclick="setFilter('active',this)">Active</button>
+              <button class="f-btn" onclick="setFilter('review',this)">Needs Review</button>
+              <button class="f-btn" onclick="setFilter('high_risk',this)">High Risk</button>
+              <button class="f-btn" onclick="setFilter('unknown',this)">Unknown</button>
               <button class="f-btn" onclick="setFilter('done',this)">Done</button>
               <button class="f-btn" onclick="setFilter('failed',this)">Failed</button>
             </div>
+            <select id="tx-agent-filter" class="f-btn" onchange="setAgentFilter(this.value)" style="padding-right:20px">
+              <option value="all">All Agents</option>
+            </select>
             <button class="w-btn" onclick="fetchIntents()" title="Refresh">↻</button>
             <button class="w-btn" onclick="toggleWidget(this)">−</button>
           </div>
@@ -375,12 +487,13 @@
             <table>
               <thead>
                 <tr>
-                  <th>Chain</th>
-                  <th>Status</th>
-                  <th>From → To</th>
-                  <th>Recipient</th>
+                  <th>Type</th>
+                  <th>Agent</th>
+                  <th>Purpose</th>
+                  <th>Risk</th>
+                  <th>Trust</th>
                   <th>Amount</th>
-                  <th>Note</th>
+                  <th>Status</th>
                   <th>Tx Hash</th>
                   <th>Time</th>
                 </tr>
@@ -405,6 +518,7 @@
             <div class="wh">
               <div class="wt"><span class="wt-icon">🤖</span> Agents <span class="w-count" id="agentCount">0</span></div>
               <div class="wa">
+                <button class="btn btn-sm btn-primary" onclick="showCreateAgentPage()" style="padding:3px 10px;font-size:11px">+ New</button>
                 <button class="w-btn" onclick="fetchAgents()" title="Refresh">↻</button>
                 <button class="w-btn" onclick="toggleWidget(this)">−</button>
               </div>
@@ -416,9 +530,11 @@
                     <tr>
                       <th>Status</th>
                       <th>Name</th>
+                      <th>Profile</th>
                       <th>Key</th>
                       <th>Assets</th>
                       <th>Chains</th>
+                      <th>Approval</th>
                       <th>Limits</th>
                       <th>Actions</th>
                     </tr>
@@ -427,27 +543,8 @@
                 </table>
               </div>
               <div class="empty-state" id="agentEmpty">
-                <div class="icon">🔑</div>
-                <p>No agents yet — expand "Create Agent" to add one.</p>
-              </div>
-            </div>
-          </div>
-
-          <!-- � Moltbook Feed -->
-          <div class="widget" id="w-moltbook">
-            <div class="wh">
-              <div class="wt"><span class="wt-icon">🐦</span> Moltbook Agent Feed (Finance Topic)<span class="live-pill">LIVE</span></div>
-              <div class="wa">
-                <button class="w-btn" onclick="fetchMoltbook()" title="Reload">↻</button>
-                <button class="w-btn" onclick="toggleWidget(this)">−</button>
-              </div>
-            </div>
-            <div class="wb pad" style="max-height:340px;overflow-y:auto">
-              <div id="moltbookPosts">
-                <div class="empty-state" id="moltbookEmpty">
-                  <div class="icon">🐦</div>
-                  <p>Loading Moltbook feed…</p>
-                </div>
+                <div class="icon">🤖</div>
+                <p>No agents yet — click <strong>+ New</strong> to create one.</p>
               </div>
             </div>
           </div>
@@ -481,10 +578,58 @@
               </div>
             </div>
           </div>
+
+          <!-- � Moltbook Feed -->
+          <div class="widget" id="w-moltbook">
+            <div class="wh">
+              <div class="wt"><span class="wt-icon">🐦</span> Moltbook Agent Feed (Finance Topic)<span class="live-pill">LIVE</span></div>
+              <div class="wa">
+                <button class="w-btn" onclick="fetchMoltbook()" title="Reload">↻</button>
+                <button class="w-btn" onclick="toggleWidget(this)">−</button>
+              </div>
+            </div>
+            <div class="wb pad" style="max-height:340px;overflow-y:auto">
+              <div id="moltbookPosts">
+                <div class="empty-state" id="moltbookEmpty">
+                  <div class="icon">🐦</div>
+                  <p>Loading Moltbook feed…</p>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- Sub-right -->
         <div class="dash-col">
+          <!-- 📈 Spend Forecast -->
+          <div class="widget" id="w-forecast">
+            <div class="wh">
+              <div class="wt"><span class="wt-icon">📈</span> Spend Forecast</div>
+              <div class="wa"><button class="w-btn" onclick="toggleWidget(this)">−</button></div>
+            </div>
+            <div class="wb pad">
+              <div id="forecastContent">
+                <div class="empty-state"><div class="icon">📈</div><p>Calculating forecast…</p></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 📡 Activity Feed -->
+          <div class="widget" id="w-feed">
+            <div class="wh">
+              <div class="wt"><span class="wt-icon">📡</span> Activity Feed <span class="live-pill">LIVE</span></div>
+              <div class="wa"><button class="w-btn" onclick="toggleWidget(this)">−</button></div>
+            </div>
+            <div class="wb pad" style="max-height:260px">
+              <div class="timeline" id="timeline">
+                <div class="empty-state" id="timelineEmpty">
+                  <div class="icon">📡</div>
+                  <p>Waiting for activity…</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <!-- � Crypto News Feed -->
           <div class="widget" id="w-crypto-news">
             <div class="wh">
@@ -513,35 +658,6 @@
             <div class="wb">
               <div class="yt-frame">
                 <iframe src="https://www.youtube.com/embed/OafXF_Ni-tY?autoplay=1&mute=1&rel=0&modestbranding=1&showinfo=0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
-              </div>
-            </div>
-          </div>
-
-          <!-- 📡 Activity Feed -->
-          <div class="widget" id="w-feed">
-            <div class="wh">
-              <div class="wt"><span class="wt-icon">📡</span> Activity Feed <span class="live-pill">LIVE</span></div>
-              <div class="wa"><button class="w-btn" onclick="toggleWidget(this)">−</button></div>
-            </div>
-            <div class="wb pad" style="max-height:260px">
-              <div class="timeline" id="timeline">
-                <div class="empty-state" id="timelineEmpty">
-                  <div class="icon">📡</div>
-                  <p>Waiting for activity…</p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- 📈 Spend Forecast -->
-          <div class="widget" id="w-forecast">
-            <div class="wh">
-              <div class="wt"><span class="wt-icon">📈</span> Spend Forecast</div>
-              <div class="wa"><button class="w-btn" onclick="toggleWidget(this)">−</button></div>
-            </div>
-            <div class="wb pad">
-              <div id="forecastContent">
-                <div class="empty-state"><div class="icon">📈</div><p>Calculating forecast…</p></div>
               </div>
             </div>
           </div>
@@ -583,13 +699,65 @@
           <input type="text" id="ed-telegram-chat-id" placeholder="Leave empty for default">
           <div class="form-hint" style="color:var(--muted)">Set a per-agent Telegram chat ID, or leave empty for global default. Current value is hidden for security — enter new value to update.</div>
         </div>
+        <div class="form-group">
+          <label>Bot Type</label>
+          <select id="ed-bot-type">
+            <option value="personal">👤 Personal Assistant</option>
+            <option value="ecommerce">🛒 E-Commerce Bot</option>
+            <option value="spot_trader">📈 Spot Trader</option>
+            <option value="dca_trader">🔄 DCA Trader</option>
+            <option value="nft_sniper">🎯 NFT Sniper</option>
+            <option value="pump_fun_sniper">🚀 Pump.fun Sniper</option>
+            <option value="polymarket_copytrader">🔮 Polymarket Copy Trader</option>
+            <option value="defi_borrower">🏦 DeFi Borrower</option>
+            <option value="custom">⚙️ Custom</option>
+          </select>
+        </div>
+        <div style="display:flex;gap:8px;align-items:flex-end">
+          <div class="form-group" style="flex:1;margin:0"><label>Bot Goal</label><input type="text" id="ed-bot-goal" required></div>
+          <button type="button" id="ed-generate-btn" onclick="generatePolicy('ed')"
+            class="btn btn-outline" style="white-space:nowrap;padding:7px 10px;font-size:11px;margin-bottom:0">✨ Generate</button>
+        </div>
+        <div id="ed-policy-preview"></div>
+        <div class="form-group">
+          <label>Approval Mode</label>
+          <select id="ed-approval-mode">
+            <option value="always_human">Always Human</option>
+            <option value="auto_within_limits">Auto Within Limits</option>
+            <option value="human_if_above_threshold">Human Above Threshold</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Human Approval Threshold (wei)</label>
+            <input type="text" id="ed-approval-threshold">
+            <div class="form-hint" id="ed-approval-threshold-hint" style="color:var(--cyan)"></div>
+          </div>
+          <div class="form-group">
+            <label>Window Spend Cap (wei)</label>
+            <input type="text" id="ed-window-limit">
+            <div class="form-hint" id="ed-window-limit-hint" style="color:var(--cyan)"></div>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>Window Seconds</label><input type="number" id="ed-window-seconds" min="0"></div>
+          <div class="form-group"><label>Rate Limit (req/min)</label><input type="number" id="ed-rate" min="0"></div>
+        </div>
         <div class="form-group"><label>Allowed Assets (comma-separated or *)</label><input type="text" id="ed-assets" placeholder="ETH,USDC or *"></div>
         <div class="form-group"><label>Allowed Chains (comma-separated or *)</label><input type="text" id="ed-chains" placeholder="sepolia,base or *"></div>
+        <div class="form-group"><label>Allowed Contracts / Addresses (comma-separated or *)</label><input type="text" id="ed-contracts" placeholder="0x… or *" style="font-family:monospace;font-size:11px"></div>
         <div class="form-row">
-          <div class="form-group"><label>Max per Tx (wei)</label><input type="text" id="ed-max-tx"></div>
-          <div class="form-group"><label>Daily Limit (wei)</label><input type="text" id="ed-daily"></div>
+          <div class="form-group">
+            <label>Max per Tx (wei)</label>
+            <input type="text" id="ed-max-tx">
+            <div class="form-hint" id="ed-max-tx-hint" style="color:var(--cyan)"></div>
+          </div>
+          <div class="form-group">
+            <label>Daily Limit (wei)</label>
+            <input type="text" id="ed-daily">
+            <div class="form-hint" id="ed-daily-hint" style="color:var(--cyan)"></div>
+          </div>
         </div>
-        <div class="form-group"><label>Rate Limit (req/min)</label><input type="number" id="ed-rate" min="0"></div>
         <div class="form-group">
           <label>Status</label>
           <select id="ed-active"><option value="true">Active</option><option value="false">Inactive</option></select>
