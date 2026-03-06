@@ -47,7 +47,7 @@ class TestConfig:
     def test_config_js_contains_api_url(self, client):
         resp = client.get("/config.js")
         assert "__CLAWSAFE_API" in resp.text
-        assert "localhost:8002" in resp.text
+        assert "/publisher" in resp.text
 
     def test_config_js_contains_api_key(self, client):
         resp = client.get("/config.js")
