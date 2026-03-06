@@ -116,6 +116,84 @@ async def publisher_proxy(path: str, request: Request):
     return Response(content=resp.content, status_code=resp.status_code, media_type=media_type)
 
 
+# ── User-Auth / Telegram proxy (so a single ngrok URL serves everything) ────
+
+@app.api_route(
+    "/telegram/{path:path}",
+    methods=["GET", "POST"],
+)
+async def telegram_proxy(path: str, request: Request):
+    """Proxy Telegram webhook calls to user_auth service."""
+    import httpx
+
+    upstream = f"{config.USER_AUTH_INTERNAL_URL.rstrip('/')}/telegram/{path.lstrip('/')}"
+
+    # Forward all headers (especially X-Telegram-Bot-Api-Secret-Token)
+    headers = {}
+    for key in ("content-type", "x-telegram-bot-api-secret-token"):
+        val = request.headers.get(key)
+        if val:
+            headers[key] = val
+
+    body = await request.body()
+
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            resp = await client.request(
+                request.method,
+                upstream,
+                headers=headers,
+                content=body if body else None,
+            )
+    except Exception as e:
+        logger.error("User-auth proxy request failed: %s %s (%s)", request.method, upstream, e)
+        return JSONResponse(
+            status_code=502,
+            content={"detail": "user_auth proxy unreachable"},
+        )
+
+    media_type = resp.headers.get("content-type", "application/json")
+    return Response(content=resp.content, status_code=resp.status_code, media_type=media_type)
+
+
+@app.api_route(
+    "/user-auth/{path:path}",
+    methods=["GET", "POST", "PUT", "DELETE"],
+)
+async def user_auth_proxy(path: str, request: Request):
+    """Proxy admin / health calls to user_auth service."""
+    import httpx
+
+    upstream = f"{config.USER_AUTH_INTERNAL_URL.rstrip('/')}/{path.lstrip('/')}"
+    if request.url.query:
+        upstream = f"{upstream}?{request.url.query}"
+
+    headers = {}
+    content_type = request.headers.get("content-type")
+    if content_type:
+        headers["Content-Type"] = content_type
+
+    body = await request.body()
+
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            resp = await client.request(
+                request.method,
+                upstream,
+                headers=headers,
+                content=body if body else None,
+            )
+    except Exception as e:
+        logger.error("User-auth proxy request failed: %s %s (%s)", request.method, upstream, e)
+        return JSONResponse(
+            status_code=502,
+            content={"detail": "user_auth proxy unreachable"},
+        )
+
+    media_type = resp.headers.get("content-type", "application/json")
+    return Response(content=resp.content, status_code=resp.status_code, media_type=media_type)
+
+
 # ── Page routes ──────────────────────────────────────────────────────────────
 
 

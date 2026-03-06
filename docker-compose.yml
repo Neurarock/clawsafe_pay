@@ -106,7 +106,8 @@ services:
     environment:
       DASHBOARD_PORT: "8008"
       PUBLISHER_API_URL: "http://publisher:8002"
-      PUBLISHER_BROWSER_URL: "http://localhost:${DASHBOARD_PORT:-8008}/publisher"
+      PUBLISHER_BROWSER_URL: "/publisher"
+      USER_AUTH_INTERNAL_URL: "http://user_auth:8000"
     depends_on:
       publisher:
         condition: service_healthy

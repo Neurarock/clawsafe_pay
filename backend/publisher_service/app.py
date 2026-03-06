@@ -275,13 +275,18 @@ app.add_middleware(
 # ── Rate-limit middleware ────────────────────────────────────────────────────
 
 _rate_limit_store: dict[str, list[float]] = {}
-RATE_LIMIT_MAX = 300   # raised from 60 — dashboard frontend polls many endpoints from one IP
+RATE_LIMIT_MAX = 600   # generous — in Docker/ngrok all traffic shares one IP
 RATE_LIMIT_WINDOW = 60.0
+_RATE_LIMIT_EXEMPT = {"/health", "/docs", "/openapi.json"}
 
 
 @app.middleware("http")
 async def rate_limit_middleware(request: Request, call_next):
     import time
+
+    # Skip rate-limiting for health checks and docs (called by Docker healthcheck)
+    if request.url.path in _RATE_LIMIT_EXEMPT:
+        return await call_next(request)
 
     client_ip = request.client.host if request.client else "unknown"
     now = time.time()

@@ -23,3 +23,8 @@ PUBLISHER_BROWSER_URL: str = os.getenv("PUBLISHER_BROWSER_URL", "/publisher")
 
 # Default agent API key for the dashboard user
 DEFAULT_PUBLISHER_API: str = os.getenv("DEFAULT_PUBLISHER_API", "")
+
+# ── User Auth (backend) ─────────────────────────────────────────────────────
+# Used to proxy Telegram webhook and admin calls through the frontend,
+# so a single ngrok / public URL can serve everything.
+USER_AUTH_INTERNAL_URL: str = os.getenv("USER_AUTH_INTERNAL_URL", "http://localhost:8000")
