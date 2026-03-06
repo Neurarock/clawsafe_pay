@@ -52,6 +52,23 @@ services:
       retries: 3
       start_period: 5s
 
+  # ── AI transaction reviewer ──────────────────────────────────────────
+  reviewer:
+    build:
+      context: .
+      dockerfile: backend/reviewer_service/Dockerfile
+    ports:
+      - "${REVIEWER_SERVICE_PORT:-8003}:8003"
+    env_file: .env
+    environment:
+      REVIEWER_SERVICE_PORT: "8003"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8003/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
   # ── Payment intent orchestrator ──────────────────────────────────────
   publisher:
     build:
@@ -63,10 +80,13 @@ services:
     environment:
       PUBLISHER_SERVICE_PORT: "8002"
       SIGNER_SERVICE_URL: "http://signer:8001"
+      REVIEWER_SERVICE_URL: "http://reviewer:8003"
       SEED_DB_PATH: "/app/backend/publisher_service/intents.db"
       SEED_SQL_PATH: "/app/seed/publisher.sql"
     depends_on:
       signer:
+        condition: service_healthy
+      reviewer:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8002/health')"]

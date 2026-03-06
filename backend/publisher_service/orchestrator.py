@@ -151,10 +151,16 @@ async def run_intent_workflow(intent_id: str) -> None:
     #   We just submit the tx details and poll for the result.
     db.update_status(intent_id, "signing")
 
+    reviewer_line = f'Reviewer recommends "{review.verdict}"'
+    if review.reasons:
+        reviewer_line += ": " + "; ".join(review.reasons[:2])  # cap at 2 for readability
+    elif review.summary:
+        reviewer_line += f": {review.summary}"
+
     note = (
-        f"Pay {intent.amount_wei} wei ({int(intent.amount_wei)/1e18:.6f} {intent.asset}) "
+        f"Pay {int(intent.amount_wei)/1e18:.6f} {intent.asset} "
         f"to {draft.to} on {chain_display} | "
-        f"Reviewer: {review.verdict} | "
+        f"{reviewer_line} | "
         f"Digest: {draft.digest[:10]}…{draft.digest[-6:]}"
     )
 
