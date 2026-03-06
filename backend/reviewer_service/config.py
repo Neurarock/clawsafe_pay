@@ -8,7 +8,7 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 
-load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+load_dotenv(Path(__file__).resolve().parent.parent.parent / ".env")
 
 # ── Service ───────────────────────────────────────────────────────────────────
 REVIEWER_SERVICE_PORT: int = int(os.getenv("REVIEWER_SERVICE_PORT", "8003"))
