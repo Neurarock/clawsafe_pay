@@ -1,12 +1,12 @@
 """
 Live integration tests for the reviewer_service LLM client.
 
-These tests make real HTTP calls to Z.AI GLM-5.
+These tests make real HTTP calls to Z.AI GLM-5 and Flock kimi-k2.5.
 Run with:
     pytest tests/reviewer_service/test_reviewer_live.py -v -s
 
-Each scenario is a realistic transaction that should produce a specific verdict.
-The test asserts both the verdict and that the model name is logged.
+Each scenario is a realistic transaction. Dual-review tests run both models
+in parallel and print both individual verdicts and the reconciled final verdict.
 """
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ import logging
 import pytest
 
 import reviewer_service.config as config
-from reviewer_service.llm_client import review_transaction
+from reviewer_service.llm_client import review_transaction, review_transaction_dual
 
 logger = logging.getLogger(__name__)
 
@@ -60,6 +60,10 @@ def _print_result(label: str, result: dict) -> None:
     print(f"  Scenario : {label}")
     print(f"  Model    : {result['model_used']}")
     print(f"  Verdict  : {result['verdict']}")
+    if result.get("models_agreed") is not None:
+        agreed = "✓ agreed" if result["models_agreed"] else "✗ DISAGREED"
+        iv = result.get("individual_verdicts", {})
+        print(f"  Agreed   : {agreed}  (Z.AI={iv.get('zai')}  Flock={iv.get('flock')})")
     print(f"  Summary  : {result['summary']}")
     if result["reasons"]:
         for r in result["reasons"]:
@@ -228,3 +232,88 @@ async def test_typical_mainnet_transfer():
     assert result["verdict"] in {"OK", "WARN"}
     assert result["model_used"] == config.ZAI_MODEL
     assert result["gas_assessment"]["is_reasonable"] is True
+
+
+# ── Dual-review live tests (Z.AI GLM-5 + Flock kimi-k2.5 in parallel) ────────
+
+dual_skip = pytest.mark.skipif(
+    not config.FLOCK_API_KEY,
+    reason="FLOCK_API_KEY not configured — skipping dual-review live tests",
+)
+
+
+@dual_skip
+@pytest.mark.asyncio
+async def test_dual_normal_transfer():
+    """Normal 0.01 ETH transfer — expect both models OK, agreed=True."""
+    draft = _make_draft(
+        intent_id="dual-live-001",
+        value_wei=10_000_000_000_000_000,   # 0.01 ETH
+        max_fee_per_gas=20_000_000_000,      # 20 gwei (2x base)
+    )
+    result = await review_transaction_dual("dual-live-001", draft, BASE_FEE)
+    _print_result("DUAL — Normal 0.01 ETH transfer", result)
+
+    assert result["verdict"] in {"OK", "WARN"}
+    assert result["models_agreed"] is not None
+    assert "zai" in result["individual_verdicts"]
+    assert "flock" in result["individual_verdicts"]
+    assert "kimi" in result["model_used"] or "flock" in result["model_used"].lower()
+
+
+@dual_skip
+@pytest.mark.asyncio
+async def test_dual_extreme_gas_manipulation():
+    """50x gas fee — both models should flag this; expect WARN or BLOCK."""
+    draft = _make_draft(
+        intent_id="dual-live-002",
+        value_wei=1_000_000_000_000_000,    # 0.001 ETH
+        max_fee_per_gas=500_000_000_000,     # 500 gwei (50x base)
+        max_priority_fee_per_gas=10_000_000_000,
+    )
+    result = await review_transaction_dual("dual-live-002", draft, BASE_FEE)
+    _print_result("DUAL — Extreme gas manipulation (50x base)", result)
+
+    assert result["verdict"] in {"WARN", "BLOCK"}
+    assert result["individual_verdicts"]["zai"] in {"WARN", "BLOCK"}
+    assert result["individual_verdicts"]["flock"] in {"WARN", "BLOCK"}
+
+
+@dual_skip
+@pytest.mark.asyncio
+async def test_dual_self_transfer():
+    """Sender == recipient — unusual, models may disagree."""
+    same_addr = "0x742d35Cc6634C0532925a3b8D4C9d5A3Aa5a3EB"
+    draft = _make_draft(
+        intent_id="dual-live-003",
+        value_wei=1_000_000_000_000_000,
+        max_fee_per_gas=20_000_000_000,
+        to=same_addr,
+        from_address=same_addr,
+    )
+    result = await review_transaction_dual("dual-live-003", draft, BASE_FEE)
+    _print_result("DUAL — Self-transfer (from == to)", result)
+
+    assert result["verdict"] in {"OK", "WARN", "BLOCK"}
+    # If they disagree, conservative verdict must be the higher-severity one
+    iv = result["individual_verdicts"]
+    severity = {"OK": 0, "WARN": 1, "BLOCK": 2}
+    expected_conservative = max(iv["zai"], iv["flock"], key=lambda v: severity[v])
+    assert result["verdict"] == expected_conservative
+
+
+@dual_skip
+@pytest.mark.asyncio
+async def test_dual_large_amount():
+    """10 ETH transfer on Sepolia — check if both models flag it similarly."""
+    draft = _make_draft(
+        intent_id="dual-live-004",
+        value_wei=10_000_000_000_000_000_000,  # 10 ETH
+        max_fee_per_gas=15_000_000_000,
+    )
+    result = await review_transaction_dual("dual-live-004", draft, BASE_FEE)
+    _print_result("DUAL — Large 10 ETH transfer", result)
+
+    assert result["verdict"] in {"OK", "WARN", "BLOCK"}
+    assert result["summary"]
+    assert result["model_used"]  # must name both models

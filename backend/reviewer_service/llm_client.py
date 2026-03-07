@@ -6,6 +6,7 @@ parses the response into a structured safety verdict.
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import re
@@ -319,3 +320,167 @@ async def review_transaction(
         result["verdict"],
     )
     return result
+
+
+_FLOCK_CHAT_URL = "https://api.flock.io/v1/chat/completions"
+
+_SEVERITY = {"BLOCK": 2, "WARN": 1, "OK": 0}
+
+
+async def _review_transaction_flock(
+    intent_id: str,
+    draft_tx: dict,
+    current_base_fee_wei: int,
+    calldata_description: str = "",
+) -> dict:
+    """
+    Call Flock API (kimi-k2.5) for an independent second review of the transaction.
+    Uses the same prompt and response parser as the Z.AI reviewer.
+    Falls back to heuristics if Flock is unavailable or not configured.
+    """
+    model = config.FLOCK_REVIEW_MODEL
+
+    if not config.FLOCK_API_KEY:
+        logger.warning(
+            "FLOCK_API_KEY not set — skipping Flock review for intent_id=%s", intent_id
+        )
+        result = _heuristic_review(draft_tx, current_base_fee_wei)
+        result["model_used"] = f"{model}:skipped-no-key"
+        return result
+
+    prompt = _build_prompt(draft_tx, current_base_fee_wei, calldata_description)
+
+    logger.info(
+        "Sending review request to Flock: intent_id=%s model=%s",
+        intent_id,
+        model,
+    )
+
+    headers = {
+        "x-litellm-api-key": config.FLOCK_API_KEY,
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+    }
+    payload = {
+        "model": model,
+        "messages": [
+            {"role": "system", "content": _SYSTEM_PROMPT},
+            {"role": "user", "content": prompt},
+        ],
+        "temperature": 0.1,
+    }
+
+    timeout = httpx.Timeout(
+        connect=10.0, read=config.FLOCK_REVIEW_TIMEOUT_SECONDS, write=10.0, pool=5.0
+    )
+
+    try:
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            resp = await client.post(_FLOCK_CHAT_URL, headers=headers, json=payload)
+        logger.info(
+            "Flock response: intent_id=%s model=%s status=%s",
+            intent_id,
+            model,
+            resp.status_code,
+        )
+        resp.raise_for_status()
+        body = resp.json()
+        llm_text = body["choices"][0]["message"]["content"]
+    except Exception as exc:
+        logger.error(
+            "Flock review failed: intent_id=%s model=%s error=%s — falling back to heuristics",
+            intent_id,
+            model,
+            exc,
+        )
+        result = _heuristic_review(draft_tx, current_base_fee_wei)
+        result["model_used"] = f"{model}:fallback-heuristic"
+        return result
+
+    result = _parse_llm_response(llm_text, draft_tx, current_base_fee_wei)
+    result["model_used"] = model
+
+    logger.info(
+        "Flock review complete: intent_id=%s model=%s verdict=%s",
+        intent_id,
+        model,
+        result["verdict"],
+    )
+    return result
+
+
+def _reconcile_verdicts(zai_result: dict, flock_result: dict) -> dict:
+    """
+    Combine two independent review verdicts into a single final report.
+
+    Rules:
+    - If both agree → use that verdict.
+    - If they disagree → take the more conservative (higher severity) verdict
+      and log the disagreement prominently.
+    - Reasons from both reviewers are included with model attribution.
+    - Gas assessment is taken from the Z.AI result (primary reviewer).
+    """
+    zai_v = zai_result["verdict"]
+    flock_v = flock_result["verdict"]
+    models_agreed = zai_v == flock_v
+
+    if models_agreed:
+        final_verdict = zai_v
+        agreement_note = f"Both reviewers agree: {final_verdict}"
+    else:
+        final_verdict = zai_v if _SEVERITY[zai_v] >= _SEVERITY[flock_v] else flock_v
+        agreement_note = (
+            f"Reviewers disagreed (Z.AI={zai_v}, Flock={flock_v}); "
+            f"taking conservative verdict: {final_verdict}"
+        )
+        logger.warning(
+            "REVIEWER DISAGREEMENT: Z.AI=%s Flock=%s → final=%s",
+            zai_v,
+            flock_v,
+            final_verdict,
+        )
+
+    # Combine reasons with model attribution
+    reasons: list[str] = []
+    for r in zai_result.get("reasons", []):
+        reasons.append(f"[Z.AI/{zai_result['model_used']}] {r}")
+    for r in flock_result.get("reasons", []):
+        reasons.append(f"[Flock/{flock_result['model_used']}] {r}")
+    if not models_agreed:
+        reasons.append(agreement_note)
+
+    # Combine summaries
+    zai_summary = zai_result.get("summary", "")
+    flock_summary = flock_result.get("summary", "")
+    if zai_summary == flock_summary or not flock_summary:
+        summary = zai_summary
+    else:
+        summary = f"Z.AI: {zai_summary} | Flock: {flock_summary}"
+
+    return {
+        "verdict": final_verdict,
+        "reasons": reasons,
+        "summary": summary,
+        "gas_assessment": zai_result.get("gas_assessment", {}),
+        "models_agreed": models_agreed,
+        "individual_verdicts": {"zai": zai_v, "flock": flock_v},
+        "model_used": f"{zai_result['model_used']}+{flock_result['model_used']}",
+    }
+
+
+async def review_transaction_dual(
+    intent_id: str,
+    draft_tx: dict,
+    current_base_fee_wei: int,
+    calldata_description: str = "",
+) -> dict:
+    """
+    Run Z.AI GLM and Flock kimi-k2.5 reviews in parallel, then reconcile.
+    Returns a combined result dict with both verdicts and a final conservative verdict.
+    """
+    zai_result, flock_result = await asyncio.gather(
+        review_transaction(intent_id, draft_tx, current_base_fee_wei, calldata_description),
+        _review_transaction_flock(intent_id, draft_tx, current_base_fee_wei, calldata_description),
+    )
+
+    return _reconcile_verdicts(zai_result, flock_result)

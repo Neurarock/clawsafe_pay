@@ -19,6 +19,11 @@ ZAI_API_BASE: str = os.getenv("ZAI_API_BASE", "https://api.z.ai/api/paas/v4")
 ZAI_MODEL: str = os.getenv("ZAI_MODEL", "glm-5")
 ZAI_TIMEOUT_SECONDS: float = float(os.getenv("ZAI_TIMEOUT_SECONDS", "30"))
 
+# ── Flock API (second independent reviewer) ───────────────────────────────────
+FLOCK_API_KEY: str = os.getenv("FLOCK_API_KEY", "")
+FLOCK_REVIEW_MODEL: str = os.getenv("FLOCK_REVIEW_MODEL", "kimi-k2.5")
+FLOCK_REVIEW_TIMEOUT_SECONDS: float = float(os.getenv("FLOCK_REVIEW_TIMEOUT_SECONDS", "30"))
+
 # ── Rate limiting ─────────────────────────────────────────────────────────────
 RATE_LIMIT_MAX: int = int(os.getenv("REVIEWER_RATE_LIMIT_MAX", "20"))
 RATE_LIMIT_WINDOW_SECONDS: int = int(os.getenv("REVIEWER_RATE_LIMIT_WINDOW", "60"))

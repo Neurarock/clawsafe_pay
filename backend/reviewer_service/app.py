@@ -16,7 +16,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
 from reviewer_service.models import ReviewRequest, ReviewReport
-from reviewer_service.llm_client import review_transaction
+from reviewer_service.llm_client import review_transaction_dual
 import reviewer_service.config as config
 
 # ── Logging ──────────────────────────────────────────────────────────────────
@@ -77,7 +77,7 @@ async def review(req: ReviewRequest):
         req.current_base_fee_wei,
     )
 
-    result = await review_transaction(
+    result = await review_transaction_dual(
         intent_id=intent_id,
         draft_tx=draft_tx,
         current_base_fee_wei=req.current_base_fee_wei,
@@ -92,12 +92,16 @@ async def review(req: ReviewRequest):
         summary=result["summary"],
         gas_assessment=result["gas_assessment"],
         model_used=result.get("model_used", config.ZAI_MODEL),
+        models_agreed=result.get("models_agreed"),
+        individual_verdicts=result.get("individual_verdicts"),
     )
 
     logger.info(
-        "Review complete: intent_id=%s verdict=%s model=%s",
+        "Review complete: intent_id=%s verdict=%s models=%s agreed=%s individual=%s",
         intent_id,
         report.verdict,
         report.model_used,
+        report.models_agreed,
+        report.individual_verdicts,
     )
     return report

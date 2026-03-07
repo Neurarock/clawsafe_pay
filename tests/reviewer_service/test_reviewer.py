@@ -21,6 +21,22 @@ from reviewer_service.llm_client import (
     review_transaction,
 )
 
+# Dual-review result shape returned by review_transaction_dual
+def _dual_ok_result(model="glm-5"):
+    return {
+        "verdict": "OK",
+        "reasons": [],
+        "summary": "Transaction looks normal.",
+        "gas_assessment": {
+            "estimated_total_fee_wei": "451500000000000",
+            "is_reasonable": True,
+            "reference": "within normal range",
+        },
+        "model_used": model,
+        "models_agreed": True,
+        "individual_verdicts": {"zai": "OK", "flock": "OK"},
+    }
+
 # ── Fixtures ──────────────────────────────────────────────────────────────────
 
 FAKE_DIGEST = "0x" + "ab" * 32
@@ -58,19 +74,9 @@ client = TestClient(app)
 
 # ── Endpoint tests ────────────────────────────────────────────────────────────
 
-@patch("reviewer_service.app.review_transaction", new_callable=AsyncMock)
+@patch("reviewer_service.app.review_transaction_dual", new_callable=AsyncMock)
 def test_review_endpoint_returns_report(mock_review):
-    mock_review.return_value = {
-        "verdict": "OK",
-        "reasons": [],
-        "summary": "Transaction looks normal.",
-        "gas_assessment": {
-            "estimated_total_fee_wei": "451500000000000",
-            "is_reasonable": True,
-            "reference": "within normal range",
-        },
-        "model_used": "glm-5",
-    }
+    mock_review.return_value = _dual_ok_result()
 
     resp = client.post("/review", json={
         "intent_id": INTENT_ID,
@@ -84,17 +90,21 @@ def test_review_endpoint_returns_report(mock_review):
     assert body["digest"] == FAKE_DIGEST
     assert body["verdict"] == "OK"
     assert body["model_used"] == "glm-5"
+    assert body["models_agreed"] is True
+    assert body["individual_verdicts"] == {"zai": "OK", "flock": "OK"}
     mock_review.assert_called_once()
 
 
-@patch("reviewer_service.app.review_transaction", new_callable=AsyncMock)
+@patch("reviewer_service.app.review_transaction_dual", new_callable=AsyncMock)
 def test_review_endpoint_block_verdict(mock_review):
     mock_review.return_value = {
         "verdict": "BLOCK",
-        "reasons": ["gas manipulation"],
+        "reasons": ["[Z.AI/glm-5] gas manipulation"],
         "summary": "Blocked: gas fee is 50x base fee.",
         "gas_assessment": {"estimated_total_fee_wei": "0", "is_reasonable": False, "reference": "anomalous"},
-        "model_used": "glm-5",
+        "model_used": "glm-5+kimi-k2.5",
+        "models_agreed": True,
+        "individual_verdicts": {"zai": "BLOCK", "flock": "BLOCK"},
     }
 
     resp = client.post("/review", json={
@@ -252,6 +262,7 @@ async def test_review_transaction_logs_model_name(caplog):
     )
 
     with caplog.at_level(logging.INFO, logger="reviewer_service.llm_client"):
+        # review_transaction (single Z.AI call) still exported for direct testing
         await review_transaction(INTENT_ID, DRAFT_TX, BASE_FEE)
 
     log_text = " ".join(caplog.messages)

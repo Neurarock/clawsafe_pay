@@ -28,3 +28,5 @@ class ReviewReport(BaseModel):
     summary: str
     gas_assessment: dict
     model_used: str = ""
+    models_agreed: Optional[bool] = None          # None when only one reviewer ran
+    individual_verdicts: Optional[dict] = None    # {"zai": "OK", "flock": "WARN"}

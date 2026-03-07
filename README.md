@@ -29,11 +29,19 @@ Agentic financial execution requires a new class of infrastructure — not walle
 
 ### FLock Track — Agentic AI for SDGs
 
-**OpenClaw integration:** ClawSafe Pay exposes a published OpenClaw skill (`SKILL_CLAWSAFEPAY.md`) with four endpoints: submit intent, poll status, list intents, list wallets. Any OpenClaw agent can delegate fund movement to ClawSafe Pay with a single API call.
+**OpenClaw integration:** ClawSafe Pay exposes a published OpenClaw skill ([SKILL_CLAWSAFEPAY.md](SKILL_CLAWSAFEPAY.md)) with four endpoints: submit intent, poll status, list intents, list wallets. Any OpenClaw agent can delegate fund movement to ClawSafe Pay with a single API call.
 
-**FLock API usage:** The publisher service runs every incoming payment intent through a **prompt-injection filter** powered by the [FLock API](https://platform.flock.io/models) (`backend/publisher_service/injection_filter.py`). User-controlled fields (`from_user`, `to_user`, `note`, `intent_id`) are scored 0–10 for injection patterns — jailbreaks, role-play directives, system-prompt overrides. Score ≥ block threshold → request rejected before it ever reaches the AI stack. This protects the downstream Z.AI reviewer from adversarial inputs embedded in agent payloads.
+**FLock API runs through the entire payment pipeline.** Every transaction passes through Flock-hosted open-source models at two critical checkpoints before a private key is ever touched.
 
-**Open-source models only:** All LLM inference uses open-source models via FLock's inference API and Z.AI's GLM series — no proprietary model vendors.
+The moment an intent arrives, user-controlled fields are scored for adversarial manipulation by a Flock model ([backend/publisher_service/injection_filter.py](backend/publisher_service/injection_filter.py)) — catching jailbreaks, role-play directives, and system-prompt overrides before they reach any reasoning model. Then, once the transaction is built, Flock's **kimi-k2.5** ([platform.flock.io/models](https://platform.flock.io/models)) independently reviews the draft alongside Z.AI GLM-5 in parallel ([backend/reviewer_service/llm_client.py](backend/reviewer_service/llm_client.py)):
+
+```
+Intent arrives ──► [Flock: injection score] ──► build tx ──► [Flock kimi-k2.5 + Z.AI GLM-5] ──► reconcile ──► sign
+```
+
+The two reviewers' verdicts are reconciled — disagreements always escalate to the more conservative outcome (BLOCK > WARN > OK), and every flagged reason is attributed to its source model. A single LLM can hallucinate a safe verdict on a malicious transaction; two independent models from different providers agreeing provides meaningfully stronger assurance. The `ReviewReport` exposes `models_agreed` and `individual_verdicts` so the full reasoning is always auditable.
+
+**Open-source models only:** All inference uses open-source models via FLock's inference API and Z.AI's GLM series — no proprietary vendors.
 
 **Multi-channel deployment:** Telegram is the human approval channel. Every pending transaction surfaces as an inline-keyboard prompt (`Approve` / `Reject`), delivered via webhook (recommended) or long-polling. Each agent can route to its own dedicated Telegram chat ID.
 
@@ -91,7 +99,7 @@ Each agent has **identity** (API key, Telegram chat ID, wallet address), **memor
 1. **Publisher** receives a `PaymentIntent` from an OpenClaw agent.
 2. **Publisher** runs user-controlled fields through the **Flock API injection filter**.
 3. **Transaction Builder** (library, no HTTP) constructs an unsigned EIP-1559 `DraftTx` and computes its signing digest via `keccak256(0x02 || rlp([...]))`.
-4. **Reviewer** (Z.AI GLM-5) analyses the `DraftTx` — gas ratios, recipient, calldata decoding — and returns a verdict.
+4. **Reviewer** runs Z.AI GLM-5 and Flock kimi-k2.5 **in parallel** against the `DraftTx`. Both independently assess gas ratios, recipient, and calldata. Verdicts are reconciled — disagreements escalate to the more conservative outcome.
 5. **Publisher** verifies the digest is unchanged from what the reviewer evaluated (security invariant).
 6. **Signer** receives the draft, requests Telegram approval from **user_auth** via HMAC-signed callback.
 7. **User_auth** sends an inline-keyboard prompt to Telegram and waits.
