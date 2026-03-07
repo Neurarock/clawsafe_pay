@@ -1,324 +1,267 @@
 # ClawSafe Pay
+*A production-oriented guardrail layer for autonomous on-chain agents.*
 
-A modular, multi-service payment pipeline for Sepolia testnet ETH transfers
-with Telegram-based two-factor approval, **multi-wallet support**, and
-prompt-injection protection.
+> *ClawSafe Pay solves the last-mile problem of agentic AI in finance: not building the AI, but making it safe enough for real people to trust. By enforcing human-in-the-loop approval on every autonomous transaction — with policy limits, AI review, and cryptographic integrity — it opens DeFi-grade financial tools to non-technical users in underserved markets, directly contributing to SDG 10.c's remittance cost reduction target.*
+
+Traditional AI systems advise. Agentic AI systems *execute*. The gap between those two — between a helpful suggestion and an irreversible on-chain transfer — is where trust breaks down. ClawSafe Pay closes that gap by separating **thinking from signing**: agents propose transactions freely, but a segregated control plane — policy enforcement, independent AI safety review, and explicit human approval over Telegram — must clear every intent before a private key is ever used. Teams get a practical way to ship agentic finance with accountable controls instead of blind automation.
 
 ---
 
-## Architecture Overview
+## UN SDG Impact
+
+### Primary: SDG 10 — Reduced Inequalities (Target 10.c)
+> *"Reduce to less than 3% the transaction costs of migrant remittances and eliminate remittance corridors with costs higher than 5%"*
+
+1.4 billion adults are unbanked. Migrant remittances through Western Union or MoneyGram cost 5–10%. Crypto reduces this to <0.1% — but adoption stalls on trust: people don't delegate fund movement to software they don't understand. ClawSafe Pay attacks this barrier directly. An AI agent executes the payment; policy guardrails enforce limits; the human approves in plain English via Telegram before anything broadcasts. A person with zero crypto knowledge can delegate to an AI agent that acts within pre-approved parameters — safely.
+
+### Secondary: SDG 8 — Decent Work and Economic Growth (Target 8.10)
+DCA bots, micro-lending interactions, automated payroll — these DeFi-grade tools are currently locked behind technical expertise. ClawSafe Pay's per-agent policy and human-in-the-loop approval makes them safely delegatable to AI, extending economic tooling to non-technical actors at near-zero marginal cost.
+
+### Third: SDG 16 — Peace, Justice and Strong Institutions (Target 16.6)
+The regulatory concern with agentic AI in finance is accountability. ClawSafe Pay gives a concrete answer: every intent carries an immutable audit trail, the reviewer produces a documented verdict, the human explicitly approves, and the digest consistency check ensures what was reviewed is exactly what was signed. This is the accountability infrastructure that makes AI financial agents governable.
+
+### Infrastructure: SDG 9 — Industry, Innovation and Infrastructure
+Agentic financial execution requires a new class of infrastructure — not wallets, not exchanges, but trust layers. ClawSafe Pay's multi-service architecture (HMAC auth, cryptographic digests, AI safety review, prompt-injection filtering) is that layer: open-source, composable, deployable anywhere.
+
+---
+
+## Hackathon Tracks
+
+### FLock Track — Agentic AI for SDGs
+
+**OpenClaw integration:** ClawSafe Pay exposes a published OpenClaw skill (`SKILL_CLAWSAFEPAY.md`) with four endpoints: submit intent, poll status, list intents, list wallets. Any OpenClaw agent can delegate fund movement to ClawSafe Pay with a single API call.
+
+**FLock API usage:** The publisher service runs every incoming payment intent through a **prompt-injection filter** powered by the [FLock API](https://platform.flock.io/models) (`backend/publisher_service/injection_filter.py`). User-controlled fields (`from_user`, `to_user`, `note`, `intent_id`) are scored 0–10 for injection patterns — jailbreaks, role-play directives, system-prompt overrides. Score ≥ block threshold → request rejected before it ever reaches the AI stack. This protects the downstream Z.AI reviewer from adversarial inputs embedded in agent payloads.
+
+**Open-source models only:** All LLM inference uses open-source models via FLock's inference API and Z.AI's GLM series — no proprietary model vendors.
+
+**Multi-channel deployment:** Telegram is the human approval channel. Every pending transaction surfaces as an inline-keyboard prompt (`Approve` / `Reject`), delivered via webhook (recommended) or long-polling. Each agent can route to its own dedicated Telegram chat ID.
+
+---
+
+### Z.AI Track — Production-Ready AI Agents
+
+Z.AI's **GLM series** is a core, non-optional component of ClawSafe Pay. It powers three distinct parts of the system:
+
+| Feature | Service | File | What Z.AI GLM Does |
+|---|---|---|---|
+| **Transaction Safety Review** | `reviewer_service` | `llm_client.py` | Analyses every draft transaction for gas manipulation, suspicious recipients, unusual amounts, and calldata mismatches. Returns `OK` / `WARN` / `BLOCK`. Logs model name + request_id as proof. |
+| **Policy Generation** | `publisher_service` | `zai_policy_client.py` | When an admin creates a new agent, GLM suggests an optimal spending policy (approval mode, limits, allowed contracts) based on the bot's stated purpose. |
+| **Agentic Transaction Planning** | `publisher_service` | `zai_instruction_client.py` | Accepts natural-language instructions ("buy WBTC with 0.005 ETH on Uniswap"), resolves wallet balances and recent trade history, and outputs a structured `PaymentIntent` via a `plan_transaction` tool call. |
+
+The reviewer falls back to deterministic heuristics if Z.AI is unavailable, keeping the pipeline live at all times.
+
+---
+
+### Animoca Minds Track — Multi-Agent Systems
+
+ClawSafe Pay is a **coordinated swarm of five specialized agents**, each owning a distinct cognitive layer:
 
 ```
-                    ┌───────────────┐
-                    │  OpenClaw /   │
-                    │  external     │
-                    │  caller       │
-                    └──────┬────────┘
-                           │  POST /intent  (API-key auth)
-                           ▼
-                   ┌────────────────┐
-                   │  publisher_    │  :8002
-                   │  service       │
-                   └───┬──────┬─────┘
-            build tx   │      │  POST /sign
-                       ▼      ▼
-          ┌─────────────┐  ┌────────────────┐
-          │ transaction │  │  signer_       │  :8001
-          │ _builder    │  │  service       │
-          │ (library)   │  └───────┬────────┘
-          └─────────────┘          │  POST /auth/request
-                                   ▼
-                           ┌────────────────┐
-               ┌───────────│  user_auth     │  :8000
-               │  Telegram │  service       │
-               │  Bot API  └────────────────┘
-               ▼
-          ┌───────────┐
-          │ Telegram  │  Approve / Reject
-          │ user      │  inline keyboard
-          └───────────┘
+┌─────────────────────────────────────────────────────────┐
+│                  MULTI-AGENT ARCHITECTURE               │
+│                                                         │
+│  OpenClaw Agent (external)                              │
+│       │  POST /intent (X-API-Key)                       │
+│       ▼                                                 │
+│  ① Publisher Agent       :8002  ─── orchestrates ───►  │
+│       │                                                 │
+│       ├──► ② Transaction Builder   (library)            │
+│       │        builds unsigned EIP-1559 tx + digest     │
+│       │                                                 │
+│       ├──► ③ Reviewer Agent        :8003                │
+│       │        Z.AI GLM safety review → OK/WARN/BLOCK   │
+│       │                                                 │
+│       └──► ④ Signer Agent          :8001                │
+│                 ▼                                       │
+│            ⑤ Auth Agent            :8000                │
+│                 ▼                                       │
+│            Telegram (human) → Approve / Reject          │
+│                 ▼                                       │
+│            eth_sendRawTransaction → Sepolia             │
+└─────────────────────────────────────────────────────────┘
 ```
 
-### Data Flow
+Each agent has **identity** (API key, Telegram chat ID, wallet address), **memory** (SQLite — payment history, agent profiles, approval records), and **cognition** (Z.AI GLM for reasoning, Flock API for adversarial filtering, HMAC for inter-agent trust). No agent has more authority than its role requires — the signer never speaks to user_auth except through the defined contract; the publisher never holds private keys.
 
-1. **Publisher** receives a `PaymentIntent` from the caller.
-2. **Publisher** uses **transaction_builder** (library) to build an unsigned
-   EIP-1559 `DraftTx` with a signing digest.
-3. **Publisher** optionally sends the `DraftTx` to **reviewer_service**
-   for AI safety analysis (verdict: `OK`, `WARN`, or `BLOCK`).
-4. **Publisher** submits the tx details to **signer_service** (`POST /sign`).
-5. **Signer** requests Telegram approval from **user_auth** (`POST /auth/request`).
-6. **User_auth** sends an inline-keyboard prompt to Telegram and polls for the
-   user's response.
-7. On **Approve**: signer looks up the private key for the requested wallet
-   (or falls back to the default), signs the tx, broadcasts it to the Sepolia
-   network via `eth_sendRawTransaction`, and returns the on-chain tx hash.
-   On **Reject/Expire**: signer reports the status.
-8. **Publisher** polls `GET /sign/{tx_id}` until terminal, stores the result.
+---
 
-> **Key principle**: The **signer_service** owns the authentication flow.
-> Callers (publisher, future services) never contact user_auth directly —
-> they submit to the signer and poll for results.
+## Architecture & Data Flow
+
+1. **Publisher** receives a `PaymentIntent` from an OpenClaw agent.
+2. **Publisher** runs user-controlled fields through the **Flock API injection filter**.
+3. **Transaction Builder** (library, no HTTP) constructs an unsigned EIP-1559 `DraftTx` and computes its signing digest via `keccak256(0x02 || rlp([...]))`.
+4. **Reviewer** (Z.AI GLM-5) analyses the `DraftTx` — gas ratios, recipient, calldata decoding — and returns a verdict.
+5. **Publisher** verifies the digest is unchanged from what the reviewer evaluated (security invariant).
+6. **Signer** receives the draft, requests Telegram approval from **user_auth** via HMAC-signed callback.
+7. **User_auth** sends an inline-keyboard prompt to Telegram and waits.
+8. On **Approve**: signer signs with the appropriate private key and broadcasts via `eth_sendRawTransaction`. On **Reject / Expire**: pipeline terminates.
+9. **Publisher** polls signer until confirmed, stores the result.
+
+> **Key principle:** The signer_service owns the authentication flow. The publisher never contacts user_auth directly — it submits to the signer and polls for results. Private keys never leave the signer.
+
+### State Machine
+
+```
+pending → building → reviewing → [BLOCK: blocked]
+                              → awaiting_approval → [reject/expire: rejected/expired]
+                                                  → signing → broadcast → confirmed
+                                                                        → failed
+```
 
 ---
 
 ## Services & Ports
 
-| Service              | Default Port | Entry Point                           |
-| -------------------- | ------------ | ------------------------------------- |
-| **user_auth**        | `8000`       | `python -m user_auth.main`            |
-| **signer_service**   | `8001`       | `python -m signer_service.main`       |
-| **publisher_service** | `8002`      | `python -m publisher_service.main`    |
-| **reviewer_service** | `8003`       | `python -m reviewer_service.main`     |
-| **frontend**         | `8008`       | `python -m frontend.main`             |
-| **transaction_builder** | *(library)* | Imported by publisher_service       |
+| Service | Port | Responsibility |
+|---|---|---|
+| `publisher_service` | 8002 | Orchestrator: intent intake, policy enforcement, state machine |
+| `signer_service` | 8001 | EIP-1559 signing, multi-wallet management, auth flow ownership |
+| `user_auth` | 8000 | Telegram 2FA: send approval prompt, receive callback, notify signer |
+| `reviewer_service` | 8003 | Z.AI GLM safety review: gas, recipients, calldata analysis |
+| `frontend` | 8008 | Dashboard SPA + API proxy (single ngrok tunnel entry point) |
+| `transaction_builder` | *(library)* | Unsigned tx construction, digest computation, policy validation |
 
 ### Multi-Wallet Support
 
-Both the signer and publisher services support **multiple wallets**. Wallets
-are configured via numbered environment variables (`WALLET_ADDR_N` /
-`WALLET_PRIV_KEY_N`, N = 1–19). Each service exposes a `GET /wallets` endpoint
-to list available wallets.
+Up to 19 sender wallets configured via `WALLET_ADDR_N` / `WALLET_PRIV_KEY_N` (N = 1–19). Callers pass `from_address` in the intent to select a wallet; if omitted, the default (`SIGNER_FROM_ADDRESS`) is used.
 
-When submitting a payment intent, callers can optionally pass a `from_address`
-field to select which wallet signs and pays for the transaction. If omitted,
-the default wallet (`SIGNER_FROM_ADDRESS`) is used.
+| Endpoint | Service | Description |
+|---|---|---|
+| `GET /wallets` | publisher | `{"wallets": [...], "default": "0x…"}` |
+| `GET /wallets` | signer | `{"wallets": [...]}` |
 
-| Endpoint                  | Service   | Auth | Description                                    |
-| ------------------------- | --------- | ---- | ---------------------------------------------- |
-| `GET /wallets`            | publisher | none | Returns `{"wallets": [...], "default": "0x…"}` |
-| `GET /wallets`            | signer    | none | Returns `{"wallets": [...]}`                   |
+### Per-Agent Policy Controls
 
-### API User / Agent Management
-
-Each external caller (bot, agent, integration) receives its own **agent API
-key** with granular permission controls. The original `PUBLISHER_API_KEY`
-becomes the **admin key** used to manage agents via the dashboard.
+Each OpenClaw agent gets its own API key with granular permissions. The admin key (`PUBLISHER_API_KEY`) manages agents but cannot submit transactions.
 
 | Feature | Description |
-| --- | --- |
-| **Bot Type & Goal** | Categorise agents (`personal`, `dca_trader`, `spot_trader`, etc.) with a free-text goal |
-| **Per-Agent Telegram Chat** | Each agent can route approval prompts to its own Telegram chat ID |
-| **Approval Mode** | `always_human`, `auto_within_limits`, or `human_if_above_threshold` |
-| **Rolling Window Limits** | `window_limit_wei` + `window_seconds` for sliding-window spend caps |
-| **Allowed Contracts** | Restrict which recipient/contract addresses the agent may target |
-| **Allowed Assets / Chains** | Token + chain allowlists per agent |
-| **Per-Tx & Daily Limits** | `max_amount_wei` and `daily_limit_wei` enforced on `POST /intent` |
+|---|---|
+| **Bot Type & Goal** | `personal`, `dca_trader`, `spot_trader`, `nft_sniper`, etc. + free-text goal |
+| **Approval Mode** | `always_human`, `auto_within_limits`, `human_if_above_threshold` |
+| **Per-Tx & Daily Limits** | `max_amount_wei`, `daily_limit_wei` |
+| **Rolling Window** | `window_limit_wei` + `window_seconds` sliding-window spend cap |
+| **Allowed Contracts** | Recipient/contract address allowlist per agent |
+| **Allowed Assets / Chains** | Token + chain allowlists |
+| **Per-Agent Telegram Chat** | Approval prompts route to agent-specific chat ID |
 
-> See [docs/api_user_management.md](docs/api_user_management.md) for full API
-> reference, dashboard guide, and schema details.
+Z.AI-powered policy generation: `POST /api-users/generate-policy` describes the bot and GLM suggests an optimal policy. Multi-turn refinement via `POST /api-users/policy-chat`.
 
-### Telegram Delivery Modes
-
-The `user_auth` service supports two modes for receiving Telegram callback
-updates:
-
-| Mode | Config | Behaviour |
-| --- | --- | --- |
-| **Webhook** (recommended) | `TELEGRAM_WEBHOOK_URL` set in `.env` | Webhook registered automatically on startup. Telegram pushes updates instantly. |
-| **Long-polling** (default) | `TELEGRAM_WEBHOOK_URL` empty/unset | Service polls Telegram every few seconds. Works behind NATs. |
-
-Admin endpoints for webhook management:
-
-| Method | Path | Description |
-| --- | --- | --- |
-| `POST` | `/admin/webhook/register` | Manually register the webhook |
-| `DELETE` | `/admin/webhook` | Delete the current webhook |
-| `GET` | `/admin/webhook/info` | Show current webhook status |
-
-When webhook mode is active, Telegram callbacks are verified via the
-`X-Telegram-Bot-Api-Secret-Token` header using the configured
-`TELEGRAM_WEBHOOK_SECRET`.
+See [docs/api_user_management.md](docs/api_user_management.md) for full API reference.
 
 ### Ngrok Single-Tunnel Proxy
-
-For external access (e.g. from a remote OpenClaw agent), expose the
-**frontend** port via a single ngrok tunnel:
 
 ```bash
 ngrok http 8008
 ```
 
-The frontend automatically proxies requests to internal services:
+| Public path | Internal target |
+|---|---|
+| `/publisher/*` | `publisher_service:8002` |
+| `/telegram/*` | `user_auth:8000` (Telegram webhook callbacks) |
+| `/user-auth/*` | `user_auth:8000` (admin endpoints) |
+| `/*` | `frontend:8008` (dashboard, static assets) |
 
-| Public path | Internal target | Purpose |
-| --- | --- | --- |
-| `/publisher/*` | `publisher_service:8002` | Payment API |
-| `/telegram/*` | `user_auth:8000` | Telegram webhook callbacks |
-| `/user-auth/*` | `user_auth:8000` | Admin & health endpoints |
-| `/*` | `frontend:8008` | Dashboard, pages, static assets |
-
-Set `TELEGRAM_WEBHOOK_URL=https://<subdomain>.ngrok-free.dev/telegram/webhook`
-in `.env` so the user_auth service auto-registers the webhook through the
-frontend proxy on startup.
-
-### Reviewer Service
-
-The **reviewer_service** (port 8003) analyses draft transactions using the
-**Z.AI GLM** language model for safety assessment before signing:
-
-- Receives `POST /review` with a `DraftTx` and current base fee.
-- Analyses the transaction for anomalies (gas manipulation, suspicious
-  recipients, unusual amounts).
-- Returns a `ReviewReport` with verdict `OK`, `WARN`, or `BLOCK`.
-
-A `BLOCK` verdict halts the pipeline immediately. If the reviewer is
-unreachable, the publisher defaults to `WARN` and continues.
-
-### Z.AI & Injection Protection
-
-| Feature | Config | Description |
-| --- | --- | --- |
-| **Policy Generation** | `ZAI_API_KEY`, `ZAI_API_BASE`, `ZAI_MODEL` | AI-powered policy suggestions for new agents via `POST /api-users/generate-policy` |
-| **Policy Chat** | same | Multi-turn policy configuration chat via `POST /api-users/policy-chat` |
-| **Agent Instruction Chat** | same | Natural-language tx planning via `POST /agent-instruction` |
-| **Tx Review** | same | AI safety review of draft transactions in reviewer_service |
-| **Prompt-Injection Filter** | `FLOCK_API_KEY`, `INJECTION_WARN_THRESHOLD`, `INJECTION_BLOCK_THRESHOLD` | Flock API scores user fields; score ≥ block threshold → rejected |
-
-All ports are configurable via `.env` environment variables.
+Set `TELEGRAM_WEBHOOK_URL=https://<subdomain>.ngrok-free.dev/telegram/webhook` in `.env` to auto-register the webhook on startup.
 
 ---
 
 ## Quick Start
 
-### Simple demo:
-
-To start service and dashboard:
-```bash
-bash demo.sh
-```
-To stop service and dashboard:
-```bash
-bash demo.sh stop
-```
-
-### 1. Prerequisites
-
-- Python 3.11+
-- A Telegram bot token (from [@BotFather](https://t.me/BotFather))
-- Your Telegram chat ID (use [@userinfobot](https://t.me/userinfobot))
-- A Sepolia testnet wallet with some test ETH
-
-### 2. Install Dependencies
+### One-line demo
 
 ```bash
-cd clawsafe_pay
-
-# Create a virtual environment (recommended)
-python -m venv .venv && source .venv/bin/activate
-
-# Install all service requirements
-pip install -r backend/publisher_service/requirements.txt \
-            -r backend/signer_service/requirements.txt \
-            -r backend/user_auth/requirements.txt \
-            -r frontend/requirements.txt
-
-# Install test dependencies
-pip install pytest pytest-asyncio respx
+bash demo.sh       # start all services + dashboard
+bash demo.sh stop  # stop everything
 ```
 
-### 3. Configure `.env`
-
-Copy and edit the `.env` file at the project root:
-
-```dotenv
-# ── USER_AUTH SERVICE (port 8000) ─────────────────────────────────
-TELEGRAM_BOT_TOKEN=<your-bot-token>
-TELEGRAM_CHAT_ID=<your-chat-id>
-HMAC_SECRET=<shared-secret>          # generate: python -c "import secrets; print(secrets.token_urlsafe(32))"
-AUTH_SERVICE_PORT=8000
-SIGNER_SERVICE_CALLBACK_URL=http://localhost:8001/auth/callback
-
-# ── SIGNER SERVICE (port 8001) ───────────────────────────────────
-SIGNER_SERVICE_PORT=8001
-USER_AUTH_URL=http://localhost:8000
-
-# Multi-wallet: add up to 19 wallet pairs (WALLET_ADDR_N / WALLET_PRIV_KEY_N)
-WALLET_ADDR_1=<your-first-wallet-address>
-WALLET_PRIV_KEY_1=<first-wallet-private-key>
-WALLET_ADDR_2=<your-second-wallet-address>  # optional
-WALLET_PRIV_KEY_2=<second-wallet-private-key>
-# ... up to WALLET_ADDR_19 / WALLET_PRIV_KEY_19
-
-# ── PUBLISHER SERVICE (port 8002) ────────────────────────────────────
-PUBLISHER_SERVICE_PORT=8002
-PUBLISHER_API_KEY=<your-api-key>     # callers must send this as X-API-Key header
-SIGNER_SERVICE_URL=http://localhost:8001
-SIGNER_FROM_ADDRESS=<default-wallet-address>  # default sender if from_address is omitted
-SEPOLIA_RPC_URL=https://rpc.sepolia.org
-POLICY_RECIPIENT_ALLOWLIST=*         # comma-separated addresses, or * for any
-
-# ── Z.AI LLM (policy generation, tx review, agent instruction) ──
-# ZAI_API_KEY=<your-zai-key>            # required for AI features
-# ZAI_API_BASE=https://api.z.ai/api/paas/v4
-# ZAI_MODEL=glm-5
-
-# ── FLOCK / INJECTION FILTER (optional) ──────────────────────────
-# FLOCK_API_KEY=<your-flock-key>
-# INJECTION_WARN_THRESHOLD=5            # 0-10 score, warn above this
-# INJECTION_BLOCK_THRESHOLD=8           # 0-10 score, block above this
-
-# ── TELEGRAM WEBHOOK (optional — enables instant delivery) ───────
-# TELEGRAM_WEBHOOK_URL=https://<subdomain>.ngrok-free.dev/telegram/webhook
-# TELEGRAM_WEBHOOK_SECRET=<random-secret>   # verifies Telegram callbacks
-```
-
-### 4. Start Services (four terminals)
-
-```bash
-# Set PYTHONPATH for backend packages
-export PYTHONPATH=backend:$PYTHONPATH
-
-# Terminal 1 — user_auth
-python -m user_auth.main
-
-# Terminal 2 — signer_service
-python -m signer_service.main
-
-# Terminal 3 — publisher_service
-python -m publisher_service.main
-
-# Terminal 4 — frontend
-python -m frontend.main
-```
-
-### Docker Compose (alternative)
+### Docker Compose
 
 ```bash
 docker compose up --build
 ```
 
-### 5. Telegram Delivery
+### Manual setup
 
-**Option A — Webhook mode (recommended for production / ngrok)**:
+**1. Prerequisites**
 
-Set `TELEGRAM_WEBHOOK_URL` in `.env` and the webhook is auto-registered on
-startup. No manual curl required.
+- Python 3.11+
+- Telegram bot token (from [@BotFather](https://t.me/BotFather))
+- Telegram chat ID (from [@userinfobot](https://t.me/userinfobot))
+- Sepolia wallet with test ETH
+- Z.AI API key (for reviewer + policy features)
+- Flock API key (for injection filter)
+
+**2. Install dependencies**
 
 ```bash
-# .env
-TELEGRAM_WEBHOOK_URL=https://<subdomain>.ngrok-free.dev/telegram/webhook
+python -m venv .venv && source .venv/bin/activate
+
+pip install -r backend/publisher_service/requirements.txt \
+            -r backend/signer_service/requirements.txt \
+            -r backend/user_auth/requirements.txt \
+            -r backend/reviewer_service/requirements.txt \
+            -r frontend/requirements.txt
+
+pip install pytest pytest-asyncio respx  # for tests
 ```
 
-**Option B — Long-polling (default, no public URL needed)**:
+**3. Configure `.env`**
 
-Leave `TELEGRAM_WEBHOOK_URL` empty. Delete any stale webhook if needed:
+```dotenv
+# ── Telegram ──────────────────────────────────────────────────────────
+TELEGRAM_BOT_TOKEN=<your-bot-token>
+TELEGRAM_CHAT_ID=<your-chat-id>
+HMAC_SECRET=<32-byte-hex>              # python -c "import secrets; print(secrets.token_hex(32))"
+
+# ── Wallets (up to 19 pairs) ──────────────────────────────────────────
+WALLET_ADDR_1=<checksum-address>
+WALLET_PRIV_KEY_1=<private-key>
+SIGNER_FROM_ADDRESS=<default-wallet>   # used when from_address is omitted
+
+# ── RPC ──────────────────────────────────────────────────────────────
+SEPOLIA_RPC_URL=https://rpc.sepolia.org
+
+# ── Publisher ─────────────────────────────────────────────────────────
+PUBLISHER_API_KEY=<admin-key>
+POLICY_RECIPIENT_ALLOWLIST=*           # comma-separated addresses, or * for any
+
+# ── Z.AI (reviewer, policy generation, agent instruction) ─────────────
+ZAI_API_KEY=<your-zai-key>
+ZAI_API_BASE=https://api.z.ai/api/paas/v4
+ZAI_MODEL=glm-5
+
+# ── Flock API (prompt-injection filter) ──────────────────────────────
+FLOCK_API_KEY=<your-flock-key>
+INJECTION_WARN_THRESHOLD=5
+INJECTION_BLOCK_THRESHOLD=7
+
+# ── Telegram Webhook (recommended) ───────────────────────────────────
+TELEGRAM_WEBHOOK_URL=https://<subdomain>.ngrok-free.dev/telegram/webhook
+TELEGRAM_WEBHOOK_SECRET=<random-secret>
+```
+
+**4. Start services**
 
 ```bash
-curl -s -X POST "https://api.telegram.org/bot<TELEGRAM_BOT_TOKEN>/deleteWebhook"
+export PYTHONPATH=backend:$PYTHONPATH
+
+python -m user_auth.main          # terminal 1  :8000
+python -m signer_service.main     # terminal 2  :8001
+python -m publisher_service.main  # terminal 3  :8002
+python -m reviewer_service.main   # terminal 4  :8003
+python -m frontend.main           # terminal 5  :8008
 ```
 
 ---
 
 ## End-to-End Test
 
-### Via publisher_service (full pipeline)
-
 ```bash
-# Submit a payment intent (uses default wallet)
+# Submit a payment intent
 curl -s -X POST http://localhost:8002/intent \
   -H "Content-Type: application/json" \
-  -H "X-API-Key: change-me-publisher-key" \
+  -H "X-API-Key: <your-agent-key>" \
   -d '{
     "intent_id": "pay-001",
     "from_user": "alice",
@@ -328,67 +271,105 @@ curl -s -X POST http://localhost:8002/intent \
     "note": "lunch money"
   }'
 
-# Submit with a specific sender wallet
-curl -s -X POST http://localhost:8002/intent \
-  -H "Content-Type: application/json" \
-  -H "X-API-Key: change-me-publisher-key" \
-  -d '{
-    "intent_id": "pay-002",
-    "from_user": "alice",
-    "to_user": "bob",
-    "amount_wei": "10000000000000000",
-    "to_address": "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045",
-    "from_address": "0xd77E4F8142a0C48A62601cD5Be99f591D2D515da",
-    "note": "lunch money from wallet 1"
-  }'
+# → Check Telegram — tap Approve, then poll:
+curl -s http://localhost:8002/intent/pay-001 \
+  -H "X-API-Key: <your-agent-key>" | python -m json.tool
 
 # List available wallets
 curl -s http://localhost:8002/wallets | python -m json.tool
 
-# Response: {"intent_id":"pay-001","status":"pending","message":"Intent received, processing started"}
-
-# Check on Telegram — you should see an approval prompt.
-# Tap Approve, then poll:
-curl -s http://localhost:8002/intent/pay-001 \
-  -H "X-API-Key: change-me-publisher-key" | python -m json.tool
-```
-
-### Via signer_service directly (bypass publisher)
-
-```bash
-curl -s -X POST http://localhost:8001/sign \
+# Use a specific sender wallet
+curl -s -X POST http://localhost:8002/intent \
   -H "Content-Type: application/json" \
+  -H "X-API-Key: <your-agent-key>" \
   -d '{
-    "to": "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045",
-    "value_wei": "1000000000000000",
-    "user_id": "alice",
-    "note": "direct test"
+    "intent_id": "pay-002",
+    "from_user": "alice",
+    "to_user": "carol",
+    "amount_wei": "5000000000000000",
+    "to_address": "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045",
+    "from_address": "0xd77E4F8142a0C48A62601cD5Be99f591D2D515da"
   }'
-
-# Returns tx_id — check status:
-curl -s http://localhost:8001/sign/<tx_id> | python -m json.tool
 ```
+
+---
+
+## Publisher API Reference
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| `POST` | `/intent` | Agent key | Submit a payment intent |
+| `GET` | `/intent/{id}` | Agent key | Poll intent status |
+| `GET` | `/intents` | Agent key | List all intents |
+| `GET` | `/wallets` | None | List available wallets |
+| `GET` | `/health` | None | Health check |
+| `POST` | `/api-users` | Admin | Create agent |
+| `GET` | `/api-users` | Admin | List agents |
+| `PUT` | `/api-users/{id}` | Admin | Update agent |
+| `DELETE` | `/api-users/{id}` | Admin | Delete agent |
+| `POST` | `/api-users/{id}/regenerate-key` | Admin | Regenerate API key |
+| `POST` | `/api-users/generate-policy` | Admin | Z.AI policy suggestion |
+| `POST` | `/api-users/policy-chat` | Admin | Multi-turn policy refinement |
+| `POST` | `/agent-instruction` | Agent | Natural-language tx planning (Z.AI) |
+
+### Reviewer API
+
+| Method | Path | Description |
+|---|---|---|
+| `POST` | `/review` | Analyse a `DraftTx`; returns `ReviewReport` with `OK`/`WARN`/`BLOCK` |
+| `GET` | `/health` | Health check |
+
+---
+
+## Security Architecture
+
+| Mechanism | Where | What it does |
+|---|---|---|
+| **HMAC-SHA256** | `signer ↔ user_auth` | Constant-time `hmac.compare_digest` over `request_id:user_id:action` |
+| **API Keys (Admin/Agent)** | `X-API-Key` header | Admin: manage agents only. Agent: submit intents only, within scoped policy |
+| **Prompt-Injection Filter** | `publisher_service/injection_filter.py` | Flock API scores 0–10; ≥ block threshold → rejected before AI stack |
+| **Digest Consistency Check** | `publisher_service/orchestrator.py` | Security invariant: digest at review time must equal digest at signing time |
+| **Anti-Replay** | `user_auth/database.py` | Duplicate `request_id` → 409 |
+| **Request Expiry** | `user_auth` | Pending approvals expire after `AUTH_REQUEST_TTL_SECONDS` (default 300s) |
+| **Rate Limiting** | `publisher_service` | 600 req/min per IP |
+| **Private Key Isolation** | `signer_service` only | No other service ever loads wallet private keys |
+| **Terminal State Immutability** | `publisher_service/database.py` | `confirmed`, `rejected`, `expired`, `blocked`, `failed` cannot re-transition |
+| **Per-Agent Telegram Routing** | publisher + user_auth | Each agent's approvals go to its own isolated chat ID |
+
+---
+
+## Multi-Chain Architecture
+
+ClawSafe Pay uses a **chain registry** (`backend/chains/registry.py`) that decouples the payment pipeline from any specific chain. Sepolia is fully operational; the registry is extensible to any chain family.
+
+| Chain | Status | Notes |
+|---|---|---|
+| **Sepolia (EVM)** | ✅ Live | EIP-1559, multi-wallet, fully tested |
+| **Base L2** | Config ready | Shares EVM implementation; needs `BASE_RPC_URL` |
+| Solana | Placeholder | Interface defined, implementation pending |
+| Bitcoin | Placeholder | UTXO model; interface defined |
+| Zcash | Placeholder | Interface defined |
+| Cardano | Placeholder | eUTxO model; interface defined |
 
 ---
 
 ## Running Tests
 
 ```bash
-# All tests
-pytest -v
+export PYTHONPATH=backend:$PYTHONPATH
 
-# Specific service
-pytest tests/user_auth/ -v
-pytest tests/signer_service/ -v
-pytest tests/publisher_service/ -v
-pytest tests/transaction_builder/ -v
+# Full suite
+python3 -m pytest tests/ -v
 
-# Multi-wallet tests
-pytest tests/test_multi_wallet.py -v
+# By service
+python3 -m pytest tests/transaction_builder/ -v   # 46 tests, all passing
+python3 -m pytest tests/test_multi_wallet.py -v
+python3 -m pytest tests/user_auth/ -v
+python3 -m pytest tests/signer_service/ -v
+python3 -m pytest tests/publisher_service/ -v
 ```
 
-Tests mock all external calls (Telegram API, RPC, inter-service HTTP) — they
-run entirely offline with no network dependencies.
+All tests mock external calls (Telegram API, Sepolia RPC, Z.AI, Flock) — fully offline, no network dependencies.
 
 ---
 
@@ -396,162 +377,81 @@ run entirely offline with no network dependencies.
 
 ```
 clawsafe_pay/
-├── .env                          # Environment variables (all services)
-├── pytest.ini                    # pytest configuration
-├── README.md                     # This file
+├── .env                          # All service configuration
+├── docker-compose.yml            # Five-service orchestration
 ├── demo.sh                       # One-line demo launcher
-├── docker-compose.yml            # Docker orchestration
+├── SKILL_CLAWSAFEPAY.md         # OpenClaw agent skill definition
 │
-├── backend/                      # All backend services & libraries
-│   ├── user_auth/                # Telegram 2FA auth service (port 8000)
-│   │   ├── app.py                #   FastAPI endpoints
-│   │   ├── config.py             #   Environment config
-│   │   ├── database.py           #   SQLite persistence
-│   │   ├── main.py               #   Uvicorn entry point
-│   │   ├── models.py             #   Pydantic models
-│   │   ├── security.py           #   HMAC verification
-│   │   ├── signer_callback.py    #   Notify signer of auth result
-│   │   ├── telegram_bot.py       #   Send/edit Telegram messages
-│   │   ├── telegram_handler.py   #   Process callback queries
-│   │   ├── telegram_poller.py    #   Long-polling fallback
-│   │   ├── telegram_webhook_setup.py  #   Webhook register/delete/info
-│   │   ├── Dockerfile
-│   │   └── requirements.txt
+├── backend/
+│   ├── publisher_service/        # Orchestrator (port 8002)
+│   │   ├── orchestrator.py       #   Async state machine
+│   │   ├── injection_filter.py   #   Flock API prompt-injection scoring
+│   │   ├── zai_policy_client.py  #   Z.AI policy generation + chat
+│   │   ├── zai_instruction_client.py # Z.AI agentic tx planning
+│   │   ├── api_users_db.py       #   Per-agent key & policy management
+│   │   └── security.py           #   Admin vs agent key separation
 │   │
-│   ├── signer_service/           # Transaction signer (port 8001)
-│   │   ├── app.py                #   FastAPI endpoints + background workflow
-│   │   ├── auth_client.py        #   HTTP client for user_auth
-│   │   ├── config.py             #   Environment config
-│   │   ├── database.py           #   SQLite persistence
-│   │   ├── main.py               #   Uvicorn entry point
-│   │   ├── models.py             #   Pydantic models
-│   │   ├── security.py           #   HMAC computation
-│   │   ├── signer.py             #   EIP-1559 tx signing + broadcast
-│   │   ├── Dockerfile
-│   │   └── requirements.txt
+│   ├── reviewer_service/         # Z.AI safety reviewer (port 8003)
+│   │   └── llm_client.py         #   GLM-5 analysis: gas, recipients, calldata
 │   │
-│   ├── publisher_service/        # Payment intent orchestrator (port 8002)
-│   │   ├── app.py                #   FastAPI endpoints
-│   │   ├── api_users_db.py       #   SQLite persistence (agent management)
-│   │   ├── api_user_models.py    #   Pydantic models for agent CRUD
-│   │   ├── clients.py            #   HTTP clients (reviewer, signer)
-│   │   ├── config.py             #   Environment config
-│   │   ├── database.py           #   SQLite persistence (payment intents)
-│   │   ├── injection_filter.py   #   Flock API prompt-injection detector
-│   │   ├── main.py               #   Uvicorn entry point
-│   │   ├── models.py             #   Pydantic models (intents)
-│   │   ├── orchestrator.py       #   Background workflow state machine
-│   │   ├── security.py           #   API-key verification (admin + agent)
-│   │   ├── wallet_models.py      #   Pydantic models for wallet endpoints
-│   │   ├── wallets_db.py         #   SQLite persistence (wallet management)
-│   │   ├── Dockerfile
-│   │   └── requirements.txt
+│   ├── signer_service/           # EIP-1559 signer (port 8001)
+│   │   ├── signer.py             #   Multi-chain signing + broadcast
+│   │   └── auth_client.py        #   Owns the user_auth flow
 │   │
-│   ├── transaction_builder/      # Unsigned tx construction (library)
-│   │   ├── builder.py            #   build_draft_tx()
-│   │   ├── models.py             #   PaymentIntent, DraftTx, PolicyConfig
-│   │   ├── policy.py             #   Pre/post-build policy checks
-│   │   ├── provider.py           #   RPC provider abstraction
-│   │   └── requirements.txt
+│   ├── user_auth/                # Telegram 2FA (port 8000)
+│   │   ├── telegram_bot.py       #   Send/edit inline-keyboard prompts
+│   │   ├── telegram_webhook_setup.py
+│   │   └── signer_callback.py    #   Notify signer of approval result
 │   │
-│   ├── chains/                   # Multi-chain support (EVM, Solana, Bitcoin, …)
-│   ├── contract_adviser/         # (placeholder — future contract analysis)
-│   └── wallets/                  # (placeholder — future wallet management)
+│   ├── transaction_builder/      # Unsigned tx library (no HTTP)
+│   │   ├── builder.py            #   build_draft_tx() + EIP-1559 digest
+│   │   └── policy.py             #   Pre/post-build policy validation
+│   │
+│   └── chains/                   # Multi-chain registry
+│       ├── registry.py           #   ChainRegistration lookup by chain_id
+│       ├── evm/sepolia/          #   ✅ Live: EVMProvider, Builder, Signer
+│       ├── evm/base_l2/          #   Config ready
+│       ├── solana/               #   Placeholder
+│       ├── bitcoin/              #   Placeholder
+│       └── cardano/ zcash/       #   Placeholders
 │
-├── reviewer_service/             # AI transaction reviewer (port 8003)
-│   ├── app.py                    #   FastAPI app (POST /review, GET /health)
-│   ├── config.py                 #   Environment config (Z.AI settings)
-│   ├── llm_client.py             #   Z.AI GLM integration
-│   ├── main.py                   #   Uvicorn entry point
-│   ├── models.py                 #   ReviewRequest, ReviewReport models
-│   └── requirements.txt          #   Python dependencies
+├── frontend/                     # Dashboard SPA + proxy (port 8008)
+│   ├── app.py                    #   FastAPI + /publisher/* and /telegram/* proxies
+│   ├── index.html                #   Command-center dashboard
+│   └── api_users.html            #   Agent management UI
 │
-├── frontend/                     # Dashboard frontend service (port 8008)
-│   ├── app.py                    #   FastAPI app + feed proxies
-│   ├── config.py                 #   Environment config
-│   ├── main.py                   #   Uvicorn entry point
-│   ├── Dockerfile
-│   ├── requirements.txt          #   Python dependencies
-│   ├── index.html                #   Command-center SPA
-│   ├── homepage.html             #   Landing page
-│   ├── security.html             #   Security architecture page
-│   ├── setup_guide.html          #   Setup guide page
-│   └── src/                      #   Static assets
-│       ├── themes.css            #     Shared theme variables (11 themes)
-│       ├── dashboard.css         #     Dashboard-specific styles
-│       ├── pages.css             #     Content-page styles
-│       ├── theme-loader.js       #     Theme persistence helper
-│       └── js/                   #     ES modules (app.js entry point)
+├── docs/
+│   ├── publisher_service_spec.md # Full state machine & API spec
+│   └── api_user_management.md   # Agent key system reference
 │
-└── tests/
-    ├── test_multi_wallet.py      # Multi-wallet integration tests
-    ├── frontend/
-    │   └── test_pages.py
-    ├── user_auth/
-    │   └── test_user_auth.py
-    ├── signer_service/
-    │   └── test_signer_service.py
+└── tests/                        # 102 tests; offline, mocked externals
+    ├── transaction_builder/      # 46 passing
+    ├── test_multi_wallet.py
     ├── publisher_service/
-    │   ├── conftest.py
-    │   ├── test_api.py
-    │   ├── test_api_users.py
-    │   ├── test_clients.py
-    │   ├── test_injection_filter.py
-    │   ├── test_injection_filter_live.py
-    │   ├── test_orchestrator.py
-    │   ├── test_pages.py
-    │   └── test_wallets.py
-    └── transaction_builder/
-        ├── conftest.py
-        ├── test_builder.py
-        └── test_policy.py
+    ├── signer_service/
+    └── user_auth/
 ```
 
 ---
 
-## Reviewer Service
+## Environment Variables Reference
 
-The **reviewer_service** is live on port `8003` and integrated into the
-transaction pipeline. It uses the **Z.AI GLM** model to analyse draft
-transactions before they proceed to signing.
-
-### Endpoints
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `POST` | `/review` | Analyse a `DraftTx`; returns `ReviewReport` with `OK` / `WARN` / `BLOCK` |
-| `GET` | `/health` | Health check |
-
-### Environment Variables
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `REVIEWER_SERVICE_PORT` | `8003` | Listen port |
-| `ZAI_API_KEY` | — | Z.AI API key (required) |
-| `ZAI_API_BASE` | `https://api.z.ai/api/paas/v4` | Z.AI base URL |
-| `ZAI_MODEL` | `glm-5` | Model name |
-| `SEPOLIA_RPC_URL` | `https://rpc.sepolia.org` | RPC for on-chain lookups |
-
-If the reviewer is unreachable, the publisher defaults to `WARN`
-and continues the workflow. A `BLOCK` verdict halts the pipeline immediately.
-
----
-
-## Security Notes
-
-- **HMAC-SHA256** authenticates requests between `signer_service ↔ user_auth`.
-- **API-key** (`X-API-Key` header) authenticates callers of `publisher_service`.
-  The admin key has full access; agent keys are permission-scoped.
-  **Only agent keys may submit transactions** (`POST /intent`).
-- **Per-agent Telegram routing** — each agent can have its own Telegram chat
-  ID for approval prompts, isolated from other agents.
-- **Rate limiting** is applied per-IP on publisher_service (600 req/min;
-  `/health`, `/docs`, `/openapi.json` exempt).
-- **Prompt-injection filter** (optional, via Flock API) scores user-controlled
-  fields before processing. Score ≥ `INJECTION_BLOCK_THRESHOLD` (default 8)
-  → request rejected; score ≥ `INJECTION_WARN_THRESHOLD` (default 5) → logged.
-- **Private keys** are only loaded by `signer_service` — no other service
-  has access to wallet keys. The multi-wallet registry maps each address to
-  its private key; the publisher service only stores wallet *addresses*.
-- **Terminal states** are immutable — once an intent reaches `confirmed`,
-  `rejected`, `expired`, `blocked`, or `failed`, it cannot transition again.
+| Variable | Service | Description |
+|---|---|---|
+| `TELEGRAM_BOT_TOKEN` | user_auth | Bot token from @BotFather |
+| `TELEGRAM_CHAT_ID` | user_auth | Default approval chat ID |
+| `TELEGRAM_WEBHOOK_URL` | user_auth | Enables webhook mode (recommended) |
+| `TELEGRAM_WEBHOOK_SECRET` | user_auth | Verifies Telegram callback header |
+| `HMAC_SECRET` | signer, user_auth | Shared 32-byte secret for inter-service auth |
+| `WALLET_ADDR_N` / `WALLET_PRIV_KEY_N` | signer | Multi-wallet pairs (N = 1–19) |
+| `SIGNER_FROM_ADDRESS` | signer | Default wallet when `from_address` omitted |
+| `SEPOLIA_RPC_URL` | signer, reviewer | Sepolia JSON-RPC endpoint |
+| `PUBLISHER_API_KEY` | publisher | Admin key — manages agents, cannot submit intents |
+| `POLICY_RECIPIENT_ALLOWLIST` | publisher | `*` or comma-separated addresses |
+| `ZAI_API_KEY` | reviewer, publisher | Z.AI API key |
+| `ZAI_API_BASE` | reviewer, publisher | Default: `https://api.z.ai/api/paas/v4` |
+| `ZAI_MODEL` | reviewer, publisher | Default: `glm-5` |
+| `FLOCK_API_KEY` | publisher | Flock API key for injection filter |
+| `INJECTION_WARN_THRESHOLD` | publisher | Score ≥ this → log warning (default 5) |
+| `INJECTION_BLOCK_THRESHOLD` | publisher | Score ≥ this → reject request (default 7) |
+| `AUTH_REQUEST_TTL_SECONDS` | user_auth | Approval expiry window (default 300) |
