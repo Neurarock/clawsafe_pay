@@ -121,12 +121,27 @@ app = FastAPI(
 # ── Rate-limit middleware (simple in-memory) ────────────────────────────────
 
 _rate_limit_store: dict[str, list[float]] = {}
-RATE_LIMIT_MAX = 30        # max requests …
+RATE_LIMIT_MAX = 600       # max requests …
 RATE_LIMIT_WINDOW = 60.0   # … per this many seconds
+_RATE_LIMIT_EXEMPT = frozenset({
+    "/health",
+    "/docs",
+    "/openapi.json",
+})
+# Prefixes that bypass rate limiting (webhook & inter-service callbacks)
+_RATE_LIMIT_EXEMPT_PREFIXES = (
+    "/telegram/",
+    "/auth/",
+    "/admin/",
+)
 
 @app.middleware("http")
 async def rate_limit_middleware(request: Request, call_next):
     import time
+
+    path = request.url.path
+    if path in _RATE_LIMIT_EXEMPT or path.startswith(_RATE_LIMIT_EXEMPT_PREFIXES):
+        return await call_next(request)
 
     client_ip = request.client.host if request.client else "unknown"
     now = time.time()

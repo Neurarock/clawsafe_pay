@@ -58,15 +58,30 @@ app = FastAPI(
 
 # ── Rate-limit middleware ───────────────────────────────────────────────────
 _rate_limit_store: dict[str, list[float]] = {}
+_RATE_LIMIT_MAX = 600
+_RATE_LIMIT_WINDOW = 60.0
+_RATE_LIMIT_EXEMPT = frozenset({
+    "/health",
+    "/docs",
+    "/openapi.json",
+})
+_RATE_LIMIT_EXEMPT_PREFIXES = (
+    "/auth/",   # inter-service callbacks from user_auth
+)
 
 @app.middleware("http")
 async def rate_limit_middleware(request: Request, call_next):
     import time
+
+    path = request.url.path
+    if path in _RATE_LIMIT_EXEMPT or path.startswith(_RATE_LIMIT_EXEMPT_PREFIXES):
+        return await call_next(request)
+
     client_ip = request.client.host if request.client else "unknown"
     now = time.time()
     timestamps = _rate_limit_store.setdefault(client_ip, [])
-    timestamps[:] = [t for t in timestamps if now - t < 60.0]
-    if len(timestamps) >= 20:
+    timestamps[:] = [t for t in timestamps if now - t < _RATE_LIMIT_WINDOW]
+    if len(timestamps) >= _RATE_LIMIT_MAX:
         return JSONResponse(status_code=429, content={"detail": "Rate limit exceeded"})
     timestamps.append(now)
     return await call_next(request)
